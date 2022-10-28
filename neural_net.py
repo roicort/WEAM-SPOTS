@@ -83,6 +83,9 @@ def get_decoder(encoded):
     # Produces an image of same size and channels as originals.
     return output_img
 
+# The number of layers defined in get_classifier.
+classifier_nlayers = None
+
 def get_classifier(encoded):
     dense = Dense(constants.domain, activation='relu')(encoded)
     drop = Dropout(0.4)(dense)
@@ -90,6 +93,7 @@ def get_classifier(encoded):
     drop = Dropout(0.4)(dense)
     classification = Dense(constants.n_labels,
         activation='softmax', name='classification')(drop)
+    classifier_nlayers = 5
     return classification
 
 class EarlyStoppingClassifier(Callback):
@@ -209,12 +213,26 @@ class EarlyStoppingAutoencoder(Callback):
 def train_classifier(prefix, es):
     confusion_matrix = np.zeros((constants.n_labels, constants.n_labels))
     histories = []
+    suffixes = {
+        constants.training_suffix: (training_data, training_labels),
+        constants.filling_suffix : (filling_data, filling_labels),
+        constants.testing_suffix : (testing_data, testing_labels)
+    }
+        
     for fold in range(constants.n_folds):
         dataset = ds.DataSet(es, fold)
         training_data, training_labels = dataset.get_training_data()
+        filling_data, filling_labels = dataset.get_filling_data()
         testing_data, testing_labels = dataset.get_testing_data()
-        truly_training = int(len(training_labels)*truly_training_percentage)
 
+        for suffix in suffixes:
+            data_filename = constants.data_filename(constants.data_prefix+suffix, es, fold)
+            labels_filename = constants.data_filename(constants.labels_prefix+suffix, es, fold)
+            data, features, labels = suffixes[suffix]
+            np.save(data_filename, data)
+            np.save(labels_filename, labels)    
+
+        truly_training = int(len(training_labels)*truly_training_percentage)
         validation_data = training_data[truly_training:]
         validation_labels = training_labels[truly_training:]
         training_data = training_data[:truly_training]
@@ -256,42 +274,52 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
     
     Uses the previously trained neural networks for generating the features.
     """
+    suffixes = {
+        constants.training_suffix: training_features,
+        constants.filling_suffix : filling_features,
+        constants.testing_suffix : testing_features
+    }
     for fold in range(constants.n_folds):
-        dataset = ds.DataSet(es, fold)
-        training_data, training_labels = dataset.get_training_data()
-        filling_data, filling_labels = dataset.get_filling_data()
-        testing_data, testing_labels = dataset.get_testing_data()
+        suffix = constants.training_suffix
+        training_features_prefix = features_prefix + suffix        
+        training_features_filename = constants.data_filename(training_features_prefix, es, fold)
+        training_data_prefix = data_prefix + suffix
+        training_data_filename = constants.data_filename(training_data_prefix, es, fold)
+        training_data = np.load(training_data_filename)
+
+        suffix = constants.filling_suffix
+        filling_features_prefix = features_prefix + suffix        
+        filling_features_filename = constants.data_filename(training_features_prefix, es, fold)
+        filling_data_prefix = data_prefix + suffix
+        filling_data_filename = constants.data_filename(training_data_prefix, es, fold)
+        filling_data = np.load(filling_data_filename)
+
+        suffix = constants.testing_suffix
+        testing_features_prefix = features_prefix + suffix        
+        testing_features_filename = constants.data_filename(testing_features_prefix, es, fold)
+        testing_data_prefix = data_prefix + suffix
+        testing_data_filename = constants.data_filename(testing_data_prefix, es, fold)
+        testing_data = np.load(testing_data_filename)
 
         # Recreate the exact same model, including its weights and the optimizer
         filename = constants.classifier_filename(model_prefix, es, fold)
         model = tf.keras.models.load_model(filename)
 
-        # Drop the autoencoder and the last layers of the full connected neural network part.
+        # Drop the last layers of the full connected neural network part.
         classifier = Model(model.input, model.output)
-        no_hot = to_categorical(testing_labels)
         classifier.compile(
             optimizer='adam', loss='categorical_crossentropy', metrics='accuracy')
-        model = Model(classifier.input, classifier.layers[-4].output)
+        model = Model(classifier.input, classifier.layers[-classifier_nlayers].output)
         model.summary()
 
         training_features = model.predict(training_data)
         filling_features = model.predict(filling_data)
         testing_features = model.predict(testing_data)
 
-        dict = {
-            constants.training_suffix: (training_data, training_features, training_labels),
-            constants.filling_suffix : (filling_data, filling_features, filling_labels),
-            constants.testing_suffix : (testing_data, testing_features, testing_labels)
-            }
-        for suffix in dict:
-            data_filename = constants.data_filename(data_prefix+suffix, es, fold)
+        for suffix in suffixes:
             features_filename = constants.data_filename(features_prefix+suffix, es, fold)
-            labels_filename = constants.data_filename(labels_prefix+suffix, es, fold)
-
-            data, features, labels = dict[suffix]
-            np.save(data_filename, data)
-            np.save(features_filename, features)
-            np.save(labels_filename, labels)    
+            features_suffix = suffixes[suffix]
+            np.save(features_filename, features_suffix)
 
 
 def train_decoder(prefix, features_prefix, data_prefix, es):
