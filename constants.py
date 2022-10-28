@@ -260,6 +260,9 @@ def seed_data_filename():
 def seed_labels_filename():
     return data_filename(learning_data_seed + labels_suffix)
 
+def model_filename(name_prefix, es, fold):
+    return filename(name_prefix, es, fold)
+
 def classifier_filename(name_prefix, es, fold):
     return filename(name_prefix + classifier_suffix, es, fold)
 

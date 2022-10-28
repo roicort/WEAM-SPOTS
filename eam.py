@@ -17,13 +17,12 @@
 
 Usage:
   eam -h | --help
-  eam (-n | -f | -a | -c | -e | -o) [--runpath=<runpath>] [ -l (en | es) ]
+  eam (-n | -f | -c | -e | -o) [--runpath=<runpath>] [ -l (en | es) ]
 
 Options:
   -h        Show this screen.
-  -n        Trains the encoder + classifier Neural networks.
+  -n        Trains the neural network (classifier+autoencoder).
   -f        Generates Features for all data using the encoder.
-  -a        Trains the encoder + decoder (Autoencoder) neural networks.
   -c        Generates graphs Characterizing classes of features (by label).
   -e        Run the experiment 1 (Evaluation).
   -o        Generate images from testing data and memories.
@@ -985,7 +984,7 @@ def save_learned_params(mem_size, fill_percent, es):
 ##############################################################################
 # Main section
 
-def create_and_train_classifiers(es):
+def create_and_train_network(es):
     model_prefix = constants.model_name(es)
     stats_prefix = model_prefix + constants.classifier_suffix
     history, conf_matrix = neural_net.train_network(model_prefix, es)
@@ -1074,11 +1073,9 @@ if __name__ == "__main__":
     # PROCESSING OF MAIN OPTIONS.
 
     if args['-n']:
-        create_and_train_classifiers(exp_settings)
+        create_and_train_network(exp_settings)
     elif args['-f']:
         produce_features_from_data(exp_settings)
-    elif args['-a']:
-        create_and_train_autoencoders(exp_settings)
     elif args['-c']:
         characterize_features(exp_settings)
     elif args['-e']:

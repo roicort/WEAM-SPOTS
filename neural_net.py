@@ -100,7 +100,7 @@ def get_classifier(encoded):
         activation='softmax', name='classifier')(drop)
     return classification
 
-class EarlyStoppingClassifier(Callback):
+class EarlyStopping(Callback):
     """ Stop training when the loss gets lower than val_loss.
 
         Arguments:
@@ -110,10 +110,12 @@ class EarlyStoppingClassifier(Callback):
     """
 
     def __init__(self):
-        super(EarlyStoppingClassifier, self).__init__()
+        super(EarlyStopping, self).__init__()
         self.patience = patience
         self.prev_val_loss = float('inf')
         self.prev_val_accuracy = 0.0
+        self.prev_val_rmse = float('inf')
+
         # best_weights to store the weights at which the loss crossing occurs.
         self.best_weights = None
         self.start = min(epochs // 20, 3)
@@ -128,73 +130,18 @@ class EarlyStoppingClassifier(Callback):
     def on_epoch_end(self, epoch, logs=None):
         loss = logs.get('loss')
         val_loss = logs.get('val_loss')
-        accuracy = logs.get('accuracy')
-        val_accuracy = logs.get('val_accuracy')
+        accuracy = logs.get('classifier_accuracy')
+        val_accuracy = logs.get('val_classifier_accuracy')
+        rmse = logs.get('autoencoder_root_mean_squared_error')
+        val_rmse = logs.get('val_autoencoder_root_mean_squared_error')
 
         if epoch < self.start:
             self.best_weights = self.model.get_weights()
-        elif (loss < val_loss) or (accuracy > val_accuracy):
+        elif (loss < val_loss) or (accuracy > val_accuracy) or (rmse < val_rmse):
             self.wait += 1
         elif (val_accuracy > self.prev_val_accuracy):
             self.wait = 0
             self.prev_val_accuracy = val_accuracy
-            self.best_weights = self.model.get_weights()
-        elif (val_loss < self.prev_val_loss):
-            self.wait = 0
-            self.prev_val_loss = val_loss
-            self.best_weights = self.model.get_weights()
-        else:
-            self.wait += 1
-        print(f'Epochs waiting: {self.wait}')
-        if self.wait >= self.patience:
-            self.stopped_epoch = epoch
-            self.model.stop_training = True
-            print("Restoring model weights from the end of the best epoch.")
-            self.model.set_weights(self.best_weights)
-
-    def on_train_end(self, logs=None):
-        if self.stopped_epoch > 0:
-            print("Epoch %05d: early stopping" % (self.stopped_epoch + 1))
-
-
-class EarlyStoppingAutoencoder(Callback):
-    """ Stop training when the loss gets lower than val_loss.
-
-        Arguments:
-            patience: Number of epochs to wait after condition has been hit.
-            After this number of no reversal, training stops.
-            It starts working after 10% of epochs have taken place.
-    """
-
-    def __init__(self):
-        super(EarlyStoppingAutoencoder, self).__init__()
-        self.patience = patience
-        self.prev_val_loss = float('inf')
-        self.prev_val_rmse = float('inf')
-        # best_weights to store the weights at which the loss crossing occurs.
-        self.best_weights = None
-        self.start = min(epochs // 20, 3)
-        self.wait = 0
-
-    def on_train_begin(self, logs=None):
-        # The number of epoch it has waited since loss crossed val_loss.
-        self.wait = 0
-        # The epoch the training stops at.
-        self.stopped_epoch = 0
-
-    def on_epoch_end(self, epoch, logs=None):
-        loss = logs.get('loss')
-        val_loss = logs.get('val_loss')
-        rmse = logs.get('root_mean_squared_error')
-        val_rmse = logs.get('val_root_mean_squared_error')
-
-        if epoch < self.start:
-            self.best_weights = self.model.get_weights()
-        elif (loss < val_loss) or (rmse < val_rmse):
-            self.wait += 1
-        elif val_rmse < self.prev_val_rmse:
-            self.wait = 0
-            self.prev_val_rmse = val_rmse
             self.best_weights = self.model.get_weights()
         elif (val_loss < self.prev_val_loss):
             self.wait = 0
@@ -254,7 +201,7 @@ def train_network(prefix, es):
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'huber'],
                     optimizer='adam',
-                    metrics=['accuracy', rmse])
+                    metrics={'classifier': 'accuracy', 'autoencoder': rmse})
         model.summary()
         history = model.fit(training_data,
                 (training_labels, training_data),
@@ -262,16 +209,16 @@ def train_network(prefix, es):
                 epochs=epochs,
                 validation_data= (validation_data,
                     {'classifier': validation_labels, 'autoencoder': validation_data}),
-                callbacks=[EarlyStoppingClassifier()],
+                callbacks=[EarlyStopping()],
                 verbose=2)
         histories.append(history)
-        history = model.evaluate(testing_data, testing_labels, return_dict=True)
-        histories.append(history)
         classifier = Model(inputs=input_data, outputs=classified)
+        history = classifier.evaluate(testing_data, testing_labels, return_dict=True)
+        histories.append(history)
         predicted_labels = classifier.predict(testing_data)
         confusion_matrix += tf.math.confusion_matrix(np.argmax(testing_labels, axis=1), 
             np.argmax(predicted_labels, axis=1), num_classes=constants.n_labels)
-        model.save(constants.classifier_filename(prefix, es, fold))
+        model.save(constants.model_filename(prefix, es, fold))
     confusion_matrix = confusion_matrix.numpy()
     totals = confusion_matrix.sum(axis=1).reshape(-1,1)
     return histories, confusion_matrix/totals
