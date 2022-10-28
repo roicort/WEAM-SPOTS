@@ -276,8 +276,8 @@ def recog_filename(name_prefix, es, fold):
 def original_image_filename(path, idx, label, es, fold):
     return image_filename(path, idx, label, original_suffix, es, fold)
 
-def produced_image_filename(dir, idx, label, produced_suffix, es, fold):
-    return image_filename(dir, idx, label, es, fold)
+def produced_image_filename(dir, idx, label, es, fold):
+    return image_filename(dir, idx, label, produced_suffix, es, fold)
 
 
 
