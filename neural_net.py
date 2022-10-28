@@ -213,18 +213,18 @@ class EarlyStoppingAutoencoder(Callback):
 def train_classifier(prefix, es):
     confusion_matrix = np.zeros((constants.n_labels, constants.n_labels))
     histories = []
-    suffixes = {
-        constants.training_suffix: (training_data, training_labels),
-        constants.filling_suffix : (filling_data, filling_labels),
-        constants.testing_suffix : (testing_data, testing_labels)
-    }
-        
     for fold in range(constants.n_folds):
         dataset = ds.DataSet(es, fold)
         training_data, training_labels = dataset.get_training_data()
         filling_data, filling_labels = dataset.get_filling_data()
         testing_data, testing_labels = dataset.get_testing_data()
 
+        suffixes = {
+            constants.training_suffix: (training_data, training_labels),
+            constants.filling_suffix : (filling_data, filling_labels),
+            constants.testing_suffix : (testing_data, testing_labels)
+        }
+            
         for suffix in suffixes:
             data_filename = constants.data_filename(constants.data_prefix+suffix, es, fold)
             labels_filename = constants.data_filename(constants.labels_prefix+suffix, es, fold)
@@ -274,11 +274,6 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
     
     Uses the previously trained neural networks for generating the features.
     """
-    suffixes = {
-        constants.training_suffix: training_features,
-        constants.filling_suffix : filling_features,
-        constants.testing_suffix : testing_features
-    }
     for fold in range(constants.n_folds):
         suffix = constants.training_suffix
         training_features_prefix = features_prefix + suffix        
@@ -289,9 +284,9 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
 
         suffix = constants.filling_suffix
         filling_features_prefix = features_prefix + suffix        
-        filling_features_filename = constants.data_filename(training_features_prefix, es, fold)
+        filling_features_filename = constants.data_filename(filling_features_prefix, es, fold)
         filling_data_prefix = data_prefix + suffix
-        filling_data_filename = constants.data_filename(training_data_prefix, es, fold)
+        filling_data_filename = constants.data_filename(filling_data_prefix, es, fold)
         filling_data = np.load(filling_data_filename)
 
         suffix = constants.testing_suffix
@@ -316,10 +311,9 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
         filling_features = model.predict(filling_data)
         testing_features = model.predict(testing_data)
 
-        for suffix in suffixes:
-            features_filename = constants.data_filename(features_prefix+suffix, es, fold)
-            features_suffix = suffixes[suffix]
-            np.save(features_filename, features_suffix)
+        np.save(training_features_filename, training_features)
+        np.save(filling_features_filename, filling_features)
+        np.save(testing_features_filename, testing_features)
 
 
 def train_decoder(prefix, features_prefix, data_prefix, es):
