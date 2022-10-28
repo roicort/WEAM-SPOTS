@@ -56,6 +56,7 @@ decoder_suffix = '-autoencoder'
 
 # Other suffixes.
 original_suffix = '-original'
+produced_suffix = '-produced'
 data_suffix = '_X'
 labels_suffix = '_Y'
 matrix_suffix = '-confrix'
@@ -241,7 +242,8 @@ def picture_filename(name_prefix, es, fold = None):
     return filename(name_prefix, es, fold, extension='.svg')
 
 def image_filename(prefix, idx, label, suffix = '', es = None, fold = None):
-    name_prefix = image_path + '/' + str(label).zfill(3) + '_' + str(idx).zfill(5)  + suffix
+    name_prefix = image_path + '/' + prefix + '/' + \
+        str(label).zfill(3) + '_' + str(idx).zfill(5)  + suffix
     return filename(name_prefix, es, fold, extension='.png')
 
 def learned_data_filename(suffix, es, fold):
@@ -272,9 +274,9 @@ def recog_filename(name_prefix, es, fold):
     return csv_filename(name_prefix, es, fold)
 
 def original_image_filename(path, idx, label, es, fold):
-    return image_filename(dir, idx, label, original_suffix, es, fold)
+    return image_filename(path, idx, label, original_suffix, es, fold)
 
-def produced_image_filename(dir, idx, label, es, fold):
+def produced_image_filename(dir, idx, label, produced_suffix, es, fold):
     return image_filename(dir, idx, label, es, fold)
 
 
