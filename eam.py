@@ -988,7 +988,7 @@ def save_learned_params(mem_size, fill_percent, es):
 def create_and_train_classifiers(es):
     model_prefix = constants.model_name(es)
     stats_prefix = model_prefix + constants.classifier_suffix
-    history, conf_matrix = neural_net.train_classifier(model_prefix, es)
+    history, conf_matrix = neural_net.train_network(model_prefix, es)
     save_history(history, stats_prefix, es)
     save_conf_matrix(conf_matrix, stats_prefix, es)
 

@@ -20,7 +20,8 @@ from sklearn.utils.class_weight import compute_class_weight
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Flatten, \
-    Reshape, Conv2DTranspose
+    Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization
+from tensorflow.keras.layers.experimental.preprocessing import Rescaling
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback
 from joblib import Parallel, delayed
@@ -48,8 +49,8 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
         else:
             conv = Conv2D(kernel_size =3, padding ='same', activation='relu', 
                 filters = filters)(entry)
-        entry = conv
-    pool = MaxPool2D(pool_size =2, strides =2, padding ='same')(conv)
+        entry = BatchNormalization()(conv)
+    pool = MaxPool2D(pool_size =2, strides =2, padding ='same')(entry)
     drop = Dropout(0.4)(pool)
     return drop
 
@@ -58,27 +59,32 @@ encoder_nlayers = 19
 
 def get_encoder(input_data):
     dropout=0.4
-    output = conv_block(input_data, 2, 16, dropout, first_block=True)
-    output = conv_block(output, 2, 32, dropout)
-    output = conv_block(output, 3, 64, dropout)
-    output = conv_block(output, 3, 128, dropout)
-    output = conv_block(output, 3, 256, dropout)
+    filters = constants.domain // 16
+    output = conv_block(input_data, 2, filters, dropout, first_block=True)
+    filters *= 2
+    output = conv_block(output, 2, filters, dropout)
+    filters *= 2
+    output = conv_block(output, 3, filters, dropout)
+    filters *= 2
+    output = conv_block(output, 3, filters, dropout)
+    filters *= 2
+    output = conv_block(output, 3, filters, dropout)
     output = Flatten()(output)
+    output = LayerNormalization()(output)
     return output
 
 def get_decoder(encoded):
     width = ds.columns // 4
     filters = constants.domain // 2
-    dense = Dense(activation = 'relu', 
-        units=width*width*filters, input_shape=(constants.domain, ) )(encoded)
+    dense = Dense(width*width*filters, activation = 'relu', input_shape=(constants.domain, ) )(encoded)
     output = Reshape((width, width, filters))(dense)
-    for i in range(4):
-        filters = filters if (i % 2) else filters // 2
-        trans = Conv2DTranspose(kernel_size=3, strides=i%2+1,padding='same', activation='relu',
+    for i in range(2):
+        filters = filters // 2
+        trans = Conv2DTranspose(kernel_size=3, strides=2,padding='same', activation='relu',
             filters= filters)(output)
         output = Dropout(0.4)(trans)
-    output_img = Conv2D(filters = 1, kernel_size=3, strides=1,activation='linear',
-        padding='same', name='autoencoder')(output)
+    output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
+    output_img = Rescaling(255.0, name='autoencoder')(output)
     # Produces an image of same size and channels as originals.
     return output_img
 
@@ -91,7 +97,7 @@ def get_classifier(encoded):
     dense = Dense(constants.domain, activation='relu')(drop)
     drop = Dropout(0.4)(dense)
     classification = Dense(constants.n_labels,
-        activation='softmax', name='classification')(drop)
+        activation='softmax', name='classifier')(drop)
     return classification
 
 class EarlyStoppingClassifier(Callback):
@@ -208,7 +214,7 @@ class EarlyStoppingAutoencoder(Callback):
             print("Epoch %05d: early stopping" % (self.stopped_epoch + 1))
 
 
-def train_classifier(prefix, es):
+def train_network(prefix, es):
     confusion_matrix = np.zeros((constants.n_labels, constants.n_labels))
     histories = []
     for fold in range(constants.n_folds):
@@ -243,22 +249,26 @@ def train_classifier(prefix, es):
         input_data = Input(shape=(ds.columns, ds.rows, 1))
         encoded = get_encoder(input_data)
         classified = get_classifier(encoded)
-        model = Model(inputs=input_data, outputs=classified)
-        model.compile(loss='categorical_crossentropy',
+        decoded = get_decoder(encoded)
+        rmse = tf.keras.metrics.RootMeanSquaredError()
+        model = Model(inputs=input_data, outputs=[classified, decoded])
+        model.compile(loss=['categorical_crossentropy', 'huber'],
                     optimizer='adam',
-                    metrics='accuracy')
+                    metrics=['accuracy', rmse])
         model.summary()
         history = model.fit(training_data,
-                training_labels,
+                (training_labels, training_data),
                 batch_size=batch_size,
                 epochs=epochs,
-                validation_data= (validation_data, validation_labels),
+                validation_data= (validation_data,
+                    {'classifier': validation_labels, 'autoencoder': validation_data}),
                 callbacks=[EarlyStoppingClassifier()],
                 verbose=2)
         histories.append(history)
         history = model.evaluate(testing_data, testing_labels, return_dict=True)
         histories.append(history)
-        predicted_labels = model.predict(testing_data)
+        classifier = Model(inputs=input_data, outputs=classified)
+        predicted_labels = classifier.predict(testing_data)
         confusion_matrix += tf.math.confusion_matrix(np.argmax(testing_labels, axis=1), 
             np.argmax(predicted_labels, axis=1), num_classes=constants.n_labels)
         model.save(constants.classifier_filename(prefix, es, fold))
@@ -344,7 +354,7 @@ def train_decoder(prefix, features_prefix, data_prefix, es):
         decoded = get_decoder(input_data)
         model = Model(inputs=input_data, outputs=decoded)
         rmse = tf.keras.metrics.RootMeanSquaredError()
-        model.compile(loss='mean_squared_error', optimizer='adam', metrics=[rmse])
+        model.compile(loss='huber', optimizer='adam', metrics=[rmse])
         model.summary()
         history = model.fit(training_features,
                 training_data,
