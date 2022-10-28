@@ -24,6 +24,7 @@ data_path = 'data/fashion'
 run_path = 'runs'
 idx_digits = 3
 
+image_path = 'images'
 testing_path = 'test'
 memories_path = 'memories'
 
@@ -239,6 +240,10 @@ def pickle_filename(name_prefix, es = None, fold = None):
 def picture_filename(name_prefix, es, fold = None):
     return filename(name_prefix, es, fold, extension='.svg')
 
+def image_filename(prefix, idx, label, suffix = '', es = None, fold = None):
+    name_prefix = image_path + '/' + str(label).zfill(3) + '_' + str(idx).zfill(5)  + suffix
+    return filename(name_prefix, es, fold, extension='.png')
+
 def learned_data_filename(suffix, es, fold):
     prefix = learning_data_learned + suffix + data_suffix
     return data_filename(prefix, es, fold)
@@ -265,6 +270,16 @@ def memory_conftrix_filename(fill, es, fold):
 
 def recog_filename(name_prefix, es, fold):
     return csv_filename(name_prefix, es, fold)
+
+def original_image_filename(path, idx, label, es, fold):
+    return image_filename(dir, idx, label, original_suffix, es, fold)
+
+def produced_image_filename(dir, idx, label, es, fold):
+    return image_filename(dir, idx, label, es, fold)
+
+
+
+
 
 def mean_idx(m):
     return m

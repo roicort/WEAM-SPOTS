@@ -24,6 +24,7 @@ from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Fl
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback
 from joblib import Parallel, delayed
+import png
 
 import constants
 import dataset as ds
@@ -337,6 +338,63 @@ def train_decoder(prefix, features_prefix, data_prefix, es):
         histories.append(history)
         model.save(constants.decoder_filename(prefix, es, fold))
     return histories
+
+def decode(model_prefix, data_prefix, labels_prefix, features_prefix, es):
+    """ Creates images from features.
+    
+    Uses the decoder part of the neural networks to (re)create images from features.
+    """
+
+    for fold in range(constants.n_folds):
+        suffix = constants.testing_suffix
+        testing_features_prefix = features_prefix + suffix
+        testing_labels_prefix = labels_prefix + suffix
+        testing_data_prefix = data_prefix + suffix
+        testing_features_filename = constants.data_filename(testing_features_prefix, es, fold)
+        testing_data_filename = constants.data_filename(testing_data_prefix, es, fold)
+        testing_labels_filename = constants.data_filename(testing_labels_prefix, es, fold)
+        testing_features = np.load(testing_features_filename)
+        testing_data = np.load(testing_data_filename)
+        testing_labels = np.load(testing_labels_filename)
+
+        model_filename = constants.decoder_filename(model_prefix, es, fold)
+        model = tf.keras.models.load_model(model_filename)
+        produced_images = model.predict(testing_features)
+        n = len(testing_labels)
+
+        Parallel(n_jobs=constants.n_jobs, verbose=5)( \
+            delayed(store_images)(original, produced, constants.testing_path, i, label, es, fold) \
+                for (i, original, produced, label) in \
+                    zip(range(n), testing_data, produced_images, testing_labels))
+
+"""         total = len(memories)
+        steps = len(constants.memory_fills)
+        step_size = int(total/steps)
+
+        for j in range(steps):
+            print('Decoding memory size ' + str(j) + ' and stage ' + str(i))
+            start = j*step_size
+            end = start + step_size
+            mem_data = memories[start:end]
+            mem_labels = labels[start:end]
+            produced_images = decoder.predict(mem_data)
+
+            Parallel(n_jobs=constants.n_jobs, verbose=5)( \
+                delayed(store_memories)(label, produced, features, constants.memories_directory(experiment, occlusion, bars_type, tolerance), i, j) \
+                    for (produced, features, label) in zip(produced_images, mem_data, mem_labels))
+ """
+
+def store_images(original, produced, directory, idx, label, es, fold):
+    original_filename = constants.original_image_filename(directory, idx, label, es, fold)
+    produced_filename = constants.produced_image_filename(directory, idx, label, es, fold)
+
+    pixels = original.reshape(ds.columns, ds.rows)
+    pixels = pixels.round().astype(np.uint8)
+    png.from_array(pixels, 'L;8').save(original_filename)
+    pixels = produced.reshape(28,28) * 255
+    pixels = pixels.round().astype(np.uint8)
+    png.from_array(pixels, 'L;8').save(produced_filename)
+
 
 class SplittedNeuralNetwork:
     def __init__ (self, prefix, es, fold):
