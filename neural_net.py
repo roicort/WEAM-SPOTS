@@ -68,16 +68,16 @@ def get_encoder(input_data):
 
 def get_decoder(encoded):
     width = ds.columns // 4
-    filters = constants.domain*2
+    filters = constants.domain // 2
     dense = Dense(activation = 'relu', 
-        units=width*width*filters, input_shape=(constants.domain), )(encoded)
+        units=width*width*filters, input_shape=(constants.domain, ) )(encoded)
     output = Reshape((width, width, filters))(dense)
     for i in range(4):
         filters = filters if (i % 2) else filters // 2
-        trans = Conv2DTranspose(kernel_size=3, strides=1,padding='same', activation='relu',
+        trans = Conv2DTranspose(kernel_size=3, strides=i%2+1,padding='same', activation='relu',
             filters= filters)(output)
         output = Dropout(0.4)(trans)
-    output_img = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid',
+    output_img = Conv2D(filters = 1, kernel_size=3, strides=1,activation='linear',
         padding='same', name='autoencoder')(output)
     # Produces an image of same size and channels as originals.
     return output_img
@@ -323,7 +323,7 @@ def train_decoder(prefix, features_prefix, data_prefix, es):
         decoded = get_decoder(input_data)
         model = Model(inputs=input_data, outputs=decoded)
         rmse = tf.keras.metrics.RootMeanSquaredError()
-        model.compile(loss='huber_loss', optimizer='adam', metrics=[rmse])
+        model.compile(loss='mean_squared_error', optimizer='adam', metrics=[rmse])
         model.summary()
         history = model.fit(training_features,
                 training_data,
