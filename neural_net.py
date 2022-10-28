@@ -57,11 +57,11 @@ encoder_nlayers = None
 
 def get_encoder(input_data):
     dropout=0.4
-    output = conv_block(input_data, 2, 32, dropout, first_block=True)
-    output = conv_block(output, 2, 64, dropout)
+    output = conv_block(input_data, 2, 16, dropout, first_block=True)
+    output = conv_block(output, 2, 32, dropout)
+    output = conv_block(output, 3, 64, dropout)
     output = conv_block(output, 3, 128, dropout)
     output = conv_block(output, 3, 256, dropout)
-    output = conv_block(output, 3, 512, dropout)
     output = Flatten()(output)
     encoder_nlayers = 2+2+3+3+1+2*4
     return output
@@ -83,7 +83,9 @@ def get_decoder(encoded):
     return output_img
 
 def get_classifier(encoded):
-    dense = Dense(constants.domain*2, activation='relu')(encoded)
+    dense = Dense(constants.domain, activation='relu')(encoded)
+    drop = Dropout(0.4)(dense)
+    dense = Dense(constants.domain, activation='relu')(drop)
     drop = Dropout(0.4)(dense)
     classification = Dense(constants.n_labels,
         activation='softmax', name='classification')(drop)

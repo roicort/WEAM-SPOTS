@@ -68,7 +68,7 @@ learning_suffixes = [[original_suffix], [agreed_suffix], [amsystem_suffix],
 
 
 n_folds = 1
-domain = 32
+domain = 256
 n_jobs = 1
 
 iota_default = 0.0
