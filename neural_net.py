@@ -54,7 +54,7 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
     return drop
 
 # The number of layers defined in get_encoder.
-encoder_nlayers = None
+encoder_nlayers = 19
 
 def get_encoder(input_data):
     dropout=0.4
@@ -64,7 +64,6 @@ def get_encoder(input_data):
     output = conv_block(output, 3, 128, dropout)
     output = conv_block(output, 3, 256, dropout)
     output = Flatten()(output)
-    encoder_nlayers = 2+2+3+3+1+2*4
     return output
 
 def get_decoder(encoded):
@@ -84,7 +83,7 @@ def get_decoder(encoded):
     return output_img
 
 # The number of layers defined in get_classifier.
-classifier_nlayers = None
+classifier_nlayers = 5
 
 def get_classifier(encoded):
     dense = Dense(constants.domain, activation='relu')(encoded)
@@ -93,7 +92,6 @@ def get_classifier(encoded):
     drop = Dropout(0.4)(dense)
     classification = Dense(constants.n_labels,
         activation='softmax', name='classification')(drop)
-    classifier_nlayers = 5
     return classification
 
 class EarlyStoppingClassifier(Callback):
@@ -228,7 +226,7 @@ def train_classifier(prefix, es):
         for suffix in suffixes:
             data_filename = constants.data_filename(constants.data_prefix+suffix, es, fold)
             labels_filename = constants.data_filename(constants.labels_prefix+suffix, es, fold)
-            data, features, labels = suffixes[suffix]
+            data, labels = suffixes[suffix]
             np.save(data_filename, data)
             np.save(labels_filename, labels)    
 
@@ -304,7 +302,7 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
         classifier = Model(model.input, model.output)
         classifier.compile(
             optimizer='adam', loss='categorical_crossentropy', metrics='accuracy')
-        model = Model(classifier.input, classifier.layers[-classifier_nlayers].output)
+        model = Model(classifier.input, classifier.layers[-classifier_nlayers-1].output)
         model.summary()
 
         training_features = model.predict(training_data)
