@@ -213,6 +213,7 @@ def train_network(prefix, es):
                 verbose=2)
         histories.append(history)
         classifier = Model(inputs=input_data, outputs=classified)
+        classifier.compile(loss='categorical_crossentropy', optimizer='adam', metrics='accuracy')
         history = classifier.evaluate(testing_data, testing_labels, return_dict=True)
         histories.append(history)
         predicted_labels = classifier.predict(testing_data)
