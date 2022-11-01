@@ -55,7 +55,7 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
     return drop
 
 # The number of layers defined in get_encoder.
-encoder_nlayers = 19
+encoder_nlayers = 39 # 2(2+2+3+3+3) + 2*5 + 3
 
 def get_encoder(input_data):
     dropout=0.4
@@ -213,12 +213,18 @@ def train_network(prefix, es):
                 verbose=2)
         histories.append(history)
         classifier = Model(inputs=input_data, outputs=classified)
-        classifier.compile(loss='categorical_crossentropy', optimizer='adam', metrics='accuracy')
+        classifier.compile(
+            loss='categorical_crossentropy', optimizer='adam',
+            metrics=['accuracy', 'precision', 'recall'])
         history = classifier.evaluate(testing_data, testing_labels, return_dict=True)
         histories.append(history)
         predicted_labels = classifier.predict(testing_data)
         confusion_matrix += tf.math.confusion_matrix(np.argmax(testing_labels, axis=1), 
             np.argmax(predicted_labels, axis=1), num_classes=constants.n_labels)
+        autoencoder = Model(inputs = input_data, output=decoded)
+        autoencoder.compile(loss='huber', optimizer='adam', metrics=rmse)
+        history = autoencoder.evaluate(testing_data, testing_data, return_dict=True)
+        histories.append(history)
         model.save(constants.model_filename(prefix, es, fold))
     confusion_matrix = confusion_matrix.numpy()
     totals = confusion_matrix.sum(axis=1).reshape(-1,1)
@@ -253,11 +259,11 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
         testing_data = np.load(testing_data_filename)
 
         # Recreate the exact same model, including its weights and the optimizer
-        filename = constants.classifier_filename(model_prefix, es, fold)
+        filename = constants.model_filename(model_prefix, es, fold)
         model = tf.keras.models.load_model(filename)
 
         # Drop the last layers of the full connected neural network part.
-        classifier = Model(model.input, model.output)
+        classifier = Model(model.input, model.output[0])
         classifier.compile(
             optimizer='adam', loss='categorical_crossentropy', metrics='accuracy')
         model = Model(classifier.input, classifier.layers[-classifier_nlayers-1].output)
@@ -272,57 +278,11 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
         np.save(testing_features_filename, testing_features)
 
 
-def train_decoder(prefix, features_prefix, data_prefix, es):
-    histories = []
-    for fold in range(constants.n_folds):
-        suffix = constants.training_suffix
-        training_features_prefix = features_prefix + suffix        
-        training_features_filename = constants.data_filename(training_features_prefix, es, fold)
-        training_data_prefix = data_prefix + suffix
-        training_data_filename = constants.data_filename(training_data_prefix, es, fold)
-
-        suffix = constants.testing_suffix
-        testing_features_prefix = features_prefix + suffix        
-        testing_features_filename = constants.data_filename(testing_features_prefix, es, fold)
-        testing_data_prefix = data_prefix + suffix
-        testing_data_filename = constants.data_filename(testing_data_prefix, es, fold)
-
-        training_features = np.load(training_features_filename)
-        training_data = np.load(training_data_filename)
-        testing_features = np.load(testing_features_filename)
-        testing_data = np.load(testing_data_filename)
-
-        truly_training = int(len(training_features)*truly_training_percentage)
-        validation_features = training_features[truly_training:]
-        validation_data = training_data[truly_training:]
-        training_features = training_features[:truly_training]
-        training_data = training_data[:truly_training]
-
-        input_data = Input(shape=(constants.domain))
-        decoded = get_decoder(input_data)
-        model = Model(inputs=input_data, outputs=decoded)
-        rmse = tf.keras.metrics.RootMeanSquaredError()
-        model.compile(loss='huber', optimizer='adam', metrics=[rmse])
-        model.summary()
-        history = model.fit(training_features,
-                training_data,
-                batch_size=batch_size,
-                epochs=epochs,
-                validation_data= (validation_features, validation_data),
-                callbacks=[EarlyStoppingAutoencoder()],
-                verbose=2)
-        histories.append(history)
-        history = model.evaluate(testing_features, testing_data, return_dict=True)
-        histories.append(history)
-        model.save(constants.decoder_filename(prefix, es, fold))
-    return histories
-
 def decode(model_prefix, data_prefix, labels_prefix, features_prefix, es):
     """ Creates images from features.
     
     Uses the decoder part of the neural networks to (re)create images from features.
     """
-
     for fold in range(constants.n_folds):
         suffix = constants.testing_suffix
         testing_features_prefix = features_prefix + suffix
@@ -335,8 +295,17 @@ def decode(model_prefix, data_prefix, labels_prefix, features_prefix, es):
         testing_data = np.load(testing_data_filename)
         testing_labels = np.load(testing_labels_filename)
 
-        model_filename = constants.decoder_filename(model_prefix, es, fold)
+        model_filename = constants.model_filename(model_prefix, es, fold)
         model = tf.keras.models.load_model(model_filename)
+        autoencoder = Model(model.input, model.output[1])
+        # Drop the encoder
+        input_mem = Input(shape=(constants.domain, ))
+        decoded = get_decoder(input_mem)
+        decoder = Model(inputs=input_mem, outputs=decoded)
+        for dlayer, alayer in zip(decoder.layers[1:], autoencoder.layers[encoder_nlayers:]):
+            dlayer.set_weights(alayer.get_weights())
+        decoder.summary()
+    
         produced_images = model.predict(testing_features)
         n = len(testing_labels)
 
