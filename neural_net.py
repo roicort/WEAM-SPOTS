@@ -150,6 +150,10 @@ class EarlyStopping(Callback):
             self.wait = 0
             self.prev_val_accuracy = val_accuracy
             self.best_weights = self.model.get_weights()
+        elif (val_rmse < self.prev_val_rmse):
+            self.wait = 0
+            self.prev_val_rmse = val_rmse
+            self.best_weights = self.model.get_weights()            
         elif (val_loss < self.prev_val_loss):
             self.wait = 0
             self.prev_val_loss = val_loss
