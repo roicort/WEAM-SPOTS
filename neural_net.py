@@ -57,8 +57,9 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
 # The number of layers defined in get_encoder.
 encoder_nlayers = 39 # 2(2+2+3+3+3) + 2*5 + 3
 
-def get_encoder(input_data):
+def get_encoder():
     dropout=0.4
+    input_data = Input(shape=(ds.columns, ds.rows, 1))
     filters = constants.domain // 16
     output = conv_block(input_data, 2, filters, dropout, first_block=True)
     filters *= 2
@@ -70,13 +71,16 @@ def get_encoder(input_data):
     filters *= 2
     output = conv_block(output, 3, filters, dropout)
     output = Flatten()(output)
-    output = LayerNormalization()(output)
-    return output
+    output = LayerNormalization(name = 'encoder')(output)
+    return input_data, output
 
-def get_decoder(encoded):
+def get_decoder():
+    input_mem = Input(shape=(constants.domain, ))
     width = ds.columns // 4
     filters = constants.domain // 2
-    dense = Dense(width*width*filters, activation = 'relu', input_shape=(constants.domain, ) )(encoded)
+    dense = Dense(
+        width*width*filters, activation = 'relu',
+        input_shape=(constants.domain, ) )(input_mem)
     output = Reshape((width, width, filters))(dense)
     for i in range(2):
         filters = filters // 2
@@ -86,19 +90,22 @@ def get_decoder(encoded):
     output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
     output_img = Rescaling(255.0, name='autoencoder')(output)
     # Produces an image of same size and channels as originals.
-    return output_img
+    return input_mem, output_img
 
 # The number of layers defined in get_classifier.
 classifier_nlayers = 5
 
-def get_classifier(encoded):
-    dense = Dense(constants.domain, activation='relu')(encoded)
+def get_classifier():
+    input_mem = Input(shape=(constants.domain, ))
+    dense = Dense(
+        constants.domain, activation='relu',
+        input_shape=(constants.domain, ))(input_mem)
     drop = Dropout(0.4)(dense)
     dense = Dense(constants.domain, activation='relu')(drop)
     drop = Dropout(0.4)(dense)
     classification = Dense(constants.n_labels,
         activation='softmax', name='classifier')(drop)
-    return classification
+    return input_mem, classification
 
 class EarlyStopping(Callback):
     """ Stop training when the loss gets lower than val_loss.
@@ -193,10 +200,18 @@ def train_network(prefix, es):
         validation_labels = to_categorical(validation_labels)
         testing_labels = to_categorical(testing_labels)
 
+        input_enc, encoded = get_encoder()
+        encoder = Model(input_enc, encoded)
+        input_cla, classified = get_classifier(encoded)
+        classifier = Model(input_cla, classified)
+        input_dec, decoded = get_decoder(encoded)
+        decoder = Model(input_dec, decoded)
+
         input_data = Input(shape=(ds.columns, ds.rows, 1))
-        encoded = get_encoder(input_data)
-        classified = get_classifier(encoded)
-        decoded = get_decoder(encoded)
+        encoded = encoder(input_data)
+        decoded = decoder(encoded)
+        classified = classifier(encoded)
+
         rmse = tf.keras.metrics.RootMeanSquaredError()
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'huber'],
@@ -212,10 +227,6 @@ def train_network(prefix, es):
                 callbacks=[EarlyStopping()],
                 verbose=2)
         histories.append(history)
-        classifier = Model(inputs=input_data, outputs=classified)
-        classifier.compile(
-            loss='categorical_crossentropy', optimizer='adam',
-            metrics=['accuracy', 'precision', 'recall'])
         history = classifier.evaluate(testing_data, testing_labels, return_dict=True)
         histories.append(history)
         predicted_labels = classifier.predict(testing_data)
@@ -225,7 +236,9 @@ def train_network(prefix, es):
         autoencoder.compile(loss='huber', optimizer='adam', metrics=rmse)
         history = autoencoder.evaluate(testing_data, testing_data, return_dict=True)
         histories.append(history)
-        model.save(constants.model_filename(prefix, es, fold))
+        encoder.save(constants.encoder_filename(prefix, es, fold))
+        decoder.save(constants.decoder_filename(prefix, es, fold))
+        classifier.save(constants.classifier_filename(prefix, es, fold))
     confusion_matrix = confusion_matrix.numpy()
     totals = confusion_matrix.sum(axis=1).reshape(-1,1)
     return histories, confusion_matrix/totals
@@ -259,14 +272,8 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
         testing_data = np.load(testing_data_filename)
 
         # Recreate the exact same model, including its weights and the optimizer
-        filename = constants.model_filename(model_prefix, es, fold)
+        filename = constants.encoder_filename(model_prefix, es, fold)
         model = tf.keras.models.load_model(filename)
-
-        # Drop the last layers of the full connected neural network part.
-        classifier = Model(model.input, model.output[0])
-        classifier.compile(
-            optimizer='adam', loss='categorical_crossentropy', metrics='accuracy')
-        model = Model(classifier.input, classifier.layers[-classifier_nlayers-1].output)
         model.summary()
 
         training_features = model.predict(training_data)
@@ -295,16 +302,9 @@ def decode(model_prefix, data_prefix, labels_prefix, features_prefix, es):
         testing_data = np.load(testing_data_filename)
         testing_labels = np.load(testing_labels_filename)
 
-        model_filename = constants.model_filename(model_prefix, es, fold)
+        model_filename = constants.decoder_filename(model_prefix, es, fold)
         model = tf.keras.models.load_model(model_filename)
-        autoencoder = Model(model.input, model.output[1])
-        # Drop the encoder
-        input_mem = Input(shape=(constants.domain, ))
-        decoded = get_decoder(input_mem)
-        decoder = Model(inputs=input_mem, outputs=decoded)
-        for dlayer, alayer in zip(decoder.layers[1:], autoencoder.layers[encoder_nlayers:]):
-            dlayer.set_weights(alayer.get_weights())
-        decoder.summary()
+        model.summary()
     
         produced_images = model.predict(testing_features)
         n = len(testing_labels)
