@@ -20,7 +20,7 @@ from sklearn.utils.class_weight import compute_class_weight
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Flatten, \
-    Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization
+    Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D
 from tensorflow.keras.layers.experimental.preprocessing import Rescaling
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback
@@ -49,26 +49,31 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
         else:
             conv = Conv2D(kernel_size =3, padding ='same', activation='relu', 
                 filters = filters)(entry)
-        entry = BatchNormalization()(conv)
+        entry = conv
+    entry = BatchNormalization()(conv)
     pool = MaxPool2D(pool_size =2, strides =2, padding ='same')(entry)
-    drop = Dropout(0.4)(pool)
+    drop = SpatialDropout2D(0.4)(pool)
     return drop
 
 # The number of layers defined in get_encoder.
 encoder_nlayers = 40
 
 def get_encoder():
-    dropout=0.4
+    dropout = 0.1
     input_data = Input(shape=(ds.columns, ds.rows, 1))
     filters = constants.domain // 16
     output = conv_block(input_data, 2, filters, dropout, first_block=True)
     filters *= 2
+    dropout += 0.7
     output = conv_block(output, 2, filters, dropout)
     filters *= 2
+    dropout += 0.7
     output = conv_block(output, 3, filters, dropout)
     filters *= 2
+    dropout += 0.7
     output = conv_block(output, 3, filters, dropout)
     filters *= 2
+    dropout += 0.9
     output = conv_block(output, 3, filters, dropout)
     output = Flatten()(output)
     output = LayerNormalization(name = 'encoder')(output)
@@ -82,12 +87,16 @@ def get_decoder():
         width*width*filters, activation = 'relu',
         input_shape=(constants.domain, ) )(input_mem)
     output = Reshape((width, width, filters))(dense)
-    for i in range(2):
-        filters = filters // 2
-        trans = Conv2DTranspose(kernel_size=3, strides=2,padding='same', activation='relu',
+    dropout = 0.4
+    for i in range(4):
+        strides = (i % 2) + 1 
+        trans = Conv2DTranspose(kernel_size=3, strides=strides,padding='same', activation='relu',
             filters= filters)(output)
-        output = Dropout(0.4)(trans)
-    output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
+        output = SpatialDropout2D(dropout)(trans)
+        dropout /= 2.0
+        filters = filters // 2 
+    output = BatchNormalization()(output)
+    output = Conv2DTranspose(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
     output_img = Rescaling(255.0, name='autoencoder')(output)
     # Produces an image of same size and channels as originals.
     return input_mem, output_img
