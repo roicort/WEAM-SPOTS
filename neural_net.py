@@ -200,19 +200,25 @@ def train_network(prefix, es):
         validation_labels = to_categorical(validation_labels)
         testing_labels = to_categorical(testing_labels)
 
+        rmse = tf.keras.metrics.RootMeanSquaredError()
+        input_data = Input(shape=(ds.columns, ds.rows, 1))
+
         input_enc, encoded = get_encoder()
         encoder = Model(input_enc, encoded)
+        encoder.compile(optimizer = 'adam')
         input_cla, classified = get_classifier(encoded)
         classifier = Model(input_cla, classified)
+        classifier.compile(
+            loss = 'categorical_crossentropy', optimizer = 'adam',
+            metrics = 'accuracy')
         input_dec, decoded = get_decoder(encoded)
         decoder = Model(input_dec, decoded)
-
-        input_data = Input(shape=(ds.columns, ds.rows, 1))
+        decoder.compile(
+            optimizer = 'adam', loss = 'huber', metrics = rmse)
         encoded = encoder(input_data)
         decoded = decoder(encoded)
         classified = classifier(encoded)
 
-        rmse = tf.keras.metrics.RootMeanSquaredError()
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'huber'],
                     optimizer='adam',
