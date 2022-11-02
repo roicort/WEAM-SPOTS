@@ -55,7 +55,7 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
     return drop
 
 # The number of layers defined in get_encoder.
-encoder_nlayers = 39 # 2(2+2+3+3+3) + 2*5 + 3
+encoder_nlayers = 40
 
 def get_encoder():
     dropout=0.4
@@ -93,7 +93,7 @@ def get_decoder():
     return input_mem, output_img
 
 # The number of layers defined in get_classifier.
-classifier_nlayers = 5
+classifier_nlayers = 6
 
 def get_classifier():
     input_mem = Input(shape=(constants.domain, ))
@@ -137,10 +137,10 @@ class EarlyStopping(Callback):
     def on_epoch_end(self, epoch, logs=None):
         loss = logs.get('loss')
         val_loss = logs.get('val_loss')
-        accuracy = logs.get('classifier_accuracy')
-        val_accuracy = logs.get('val_classifier_accuracy')
-        rmse = logs.get('autoencoder_root_mean_squared_error')
-        val_rmse = logs.get('val_autoencoder_root_mean_squared_error')
+        accuracy = logs.get('model_1_accuracy')
+        val_accuracy = logs.get('val_model_1_accuracy')
+        rmse = logs.get('model_2_root_mean_squared_error')
+        val_rmse = logs.get('val_model_2_root_mean_squared_error')
 
         if epoch < self.start:
             self.best_weights = self.model.get_weights()
@@ -202,10 +202,14 @@ def train_network(prefix, es):
 
         input_enc, encoded = get_encoder()
         encoder = Model(input_enc, encoded)
-        input_cla, classified = get_classifier(encoded)
+        input_cla, classified = get_classifier()
         classifier = Model(input_cla, classified)
-        input_dec, decoded = get_decoder(encoded)
+        input_dec, decoded = get_decoder()
         decoder = Model(input_dec, decoded)
+
+        encoder.summary()
+        classifier.summary()
+        decoder.summary()
 
         input_data = Input(shape=(ds.columns, ds.rows, 1))
         encoded = encoder(input_data)
@@ -216,14 +220,14 @@ def train_network(prefix, es):
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'huber'],
                     optimizer='adam',
-                    metrics={'classifier': 'accuracy', 'autoencoder': rmse})
+                    metrics={'model_1': 'accuracy', 'model_2': rmse})
         model.summary()
         history = model.fit(training_data,
                 (training_labels, training_data),
                 batch_size=batch_size,
                 epochs=epochs,
                 validation_data= (validation_data,
-                    {'classifier': validation_labels, 'autoencoder': validation_data}),
+                    {'model_1': validation_labels, 'model_2': validation_data}),
                 callbacks=[EarlyStopping()],
                 verbose=2)
         histories.append(history)
