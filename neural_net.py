@@ -30,7 +30,7 @@ import png
 import constants
 import dataset as ds
 
-batch_size = 256
+batch_size = 32
 epochs = 300
 patience = 5
 truly_training_percentage = 0.80
@@ -200,23 +200,32 @@ def train_network(prefix, es):
         validation_labels = to_categorical(validation_labels)
         testing_labels = to_categorical(testing_labels)
 
+        rmse = tf.keras.metrics.RootMeanSquaredError()
+        input_data = Input(shape=(ds.columns, ds.rows, 1))
+
         input_enc, encoded = get_encoder()
         encoder = Model(input_enc, encoded)
+        encoder.compile(optimizer = 'adam')
+        encoder.summary()
         input_cla, classified = get_classifier()
         classifier = Model(input_cla, classified)
+        classifier.compile(
+            loss = 'categorical_crossentropy', optimizer = 'adam',
+            metrics = 'accuracy')
+        classifier.summary()
         input_dec, decoded = get_decoder()
         decoder = Model(input_dec, decoded)
-
-        encoder.summary()
-        classifier.summary()
+        decoder.compile(
+            optimizer = 'adam', loss = 'huber', metrics = rmse)
         decoder.summary()
-
-        input_data = Input(shape=(ds.columns, ds.rows, 1))
         encoded = encoder(input_data)
         decoded = decoder(encoded)
         classified = classifier(encoded)
+        full_classifier = Model(inputs=input_data, outputs=classified)
+        full_classifier.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = 'accuracy') 
+        autoencoder = Model(inputs = input_data, outputs=decoded)
+        autoencoder.compile(loss='huber', optimizer='adam', metrics=rmse)
 
-        rmse = tf.keras.metrics.RootMeanSquaredError()
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'huber'],
                     optimizer='adam',
@@ -231,13 +240,11 @@ def train_network(prefix, es):
                 callbacks=[EarlyStopping()],
                 verbose=2)
         histories.append(history)
-        history = classifier.evaluate(testing_data, testing_labels, return_dict=True)
+        history = full_classifier.evaluate(testing_data, testing_labels, return_dict=True)
         histories.append(history)
-        predicted_labels = classifier.predict(testing_data)
+        predicted_labels = full_classifier.predict(testing_data)
         confusion_matrix += tf.math.confusion_matrix(np.argmax(testing_labels, axis=1), 
             np.argmax(predicted_labels, axis=1), num_classes=constants.n_labels)
-        autoencoder = Model(inputs = input_data, output=decoded)
-        autoencoder.compile(loss='huber', optimizer='adam', metrics=rmse)
         history = autoencoder.evaluate(testing_data, testing_data, return_dict=True)
         histories.append(history)
         encoder.save(constants.encoder_filename(prefix, es, fold))
