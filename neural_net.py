@@ -20,7 +20,8 @@ from sklearn.utils.class_weight import compute_class_weight
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Flatten, \
-    Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D
+    Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D, \
+    UpSampling2D
 from tensorflow.keras.layers.experimental.preprocessing import Rescaling
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback
@@ -32,7 +33,7 @@ import dataset as ds
 
 batch_size = 32
 epochs = 300
-patience = 5
+patience = 7
 truly_training_percentage = 0.80
 
 def get_weights(labels):
@@ -49,9 +50,8 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
         else:
             conv = Conv2D(kernel_size =3, padding ='same', activation='relu', 
                 filters = filters)(entry)
-        entry = conv
-    entry = BatchNormalization()(conv)
-    pool = MaxPool2D(pool_size =2, strides =2, padding ='same')(entry)
+        entry = BatchNormalization()(conv)
+    pool = MaxPool2D(pool_size = 3, strides =2, padding ='same')(entry)
     drop = SpatialDropout2D(0.4)(pool)
     return drop
 
@@ -87,16 +87,17 @@ def get_decoder():
         width*width*filters, activation = 'relu',
         input_shape=(constants.domain, ) )(input_mem)
     output = Reshape((width, width, filters))(dense)
+    filters *= 2
     dropout = 0.4
-    for i in range(4):
-        strides = (i % 2) + 1 
-        trans = Conv2DTranspose(kernel_size=3, strides=strides,padding='same', activation='relu',
+    for i in range(2):
+        trans = Conv2D(kernel_size=3, strides=1,padding='same', activation='relu',
             filters= filters)(output)
-        output = SpatialDropout2D(dropout)(trans)
+        pool = UpSampling2D(size=2)(trans)
+        output = SpatialDropout2D(dropout)(pool)
         dropout /= 2.0
         filters = filters // 2 
-    output = BatchNormalization()(output)
-    output = Conv2DTranspose(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
+        output = BatchNormalization()(output)
+    output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
     output_img = Rescaling(255.0, name='autoencoder')(output)
     # Produces an image of same size and channels as originals.
     return input_mem, output_img
@@ -229,7 +230,7 @@ def train_network(prefix, es):
         input_dec, decoded = get_decoder()
         decoder = Model(input_dec, decoded)
         decoder.compile(
-            optimizer = 'adam', loss = 'huber', metrics = rmse)
+            optimizer = 'adam', loss = 'mean_squared_error', metrics = rmse)
         decoder.summary()
         encoded = encoder(input_data)
         decoded = decoder(encoded)
@@ -240,7 +241,7 @@ def train_network(prefix, es):
         autoencoder.compile(loss='huber', optimizer='adam', metrics=rmse)
 
         model = Model(inputs=input_data, outputs=[classified, decoded])
-        model.compile(loss=['categorical_crossentropy', 'huber'],
+        model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
                     optimizer='adam',
                     metrics={'model_1': 'accuracy', 'model_2': rmse})
         model.summary()
