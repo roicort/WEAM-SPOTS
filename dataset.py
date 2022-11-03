@@ -37,7 +37,7 @@ class DataSet:
     def load_dataset(self, path):
         data_train, labels_train = self.load_mnist(path, kind='train')
         data_test, labels_test = self.load_mnist(path, kind='t10k')
-        data = np.concatenate((data_train, data_test), axis=0)
+        data = np.concatenate((data_train, data_test), axis=0, dtype=float)
         labels = np.concatenate((labels_train, labels_test), axis=0)
         pairs = self.shuffle(data, labels)
         return self._data_per_label(pairs)
