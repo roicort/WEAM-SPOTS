@@ -36,21 +36,16 @@ import dataset
 import constants
 from associative import AssociativeMemory, AssociativeMemorySystem
 import seaborn
-from numpy.core.defchararray import array
 import json
 import random
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from joblib import Parallel, delayed
-from numpy.core.einsumfunc import einsum_path
 import numpy as np
 from itertools import islice
 import gettext
 import gc
 from docopt import docopt
-import copy
-import csv
-from datetime import datetime
 import sys
 sys.setrecursionlimit(10000)
 

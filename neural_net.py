@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import math
-from matplotlib.cbook import flatten
 import numpy as np
-from sklearn.utils.class_weight import compute_class_weight
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Flatten, \
@@ -34,10 +30,6 @@ batch_size = 32
 epochs = 300
 patience = 5
 truly_training_percentage = 0.80
-
-def get_weights(labels):
-    class_weights = compute_class_weight('balanced', classes=constants.all_labels, y=labels)
-    return dict(enumerate(class_weights))
 
 def conv_block(entry, layers, filters, dropout, first_block = False):
     conv = None

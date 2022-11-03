@@ -12,16 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import csv
 import gzip
-from turtle import shape
 import numpy as np
 import os
 import random
-import re
 import constants
-import matplotlib.pyplot as plt
 
 
 # This code is an abstraction for the MNIST Fashion dataset,
