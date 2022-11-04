@@ -91,7 +91,6 @@ def get_decoder():
         output = BatchNormalization()(output)
     output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
     output_img = Rescaling(255.0, name='autoencoder')(output)
-    # Produces an image of same size and channels as originals.
     return input_mem, output_img
 
 # The number of layers defined in get_classifier.
@@ -351,11 +350,10 @@ def decode(model_prefix, data_prefix, labels_prefix, features_prefix, es):
 def store_images(original, produced, directory, idx, label, es, fold):
     original_filename = constants.original_image_filename(directory, idx, label, es, fold)
     produced_filename = constants.produced_image_filename(directory, idx, label, es, fold)
-
     pixels = original.reshape(ds.columns, ds.rows)
     pixels = pixels.round().astype(np.uint8)
     png.from_array(pixels, 'L;8').save(original_filename)
-    pixels = produced.reshape(28,28) * 255
+    pixels = produced.reshape(28,28)
     pixels = pixels.round().astype(np.uint8)
     png.from_array(pixels, 'L;8').save(produced_filename)
 
