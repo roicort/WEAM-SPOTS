@@ -56,10 +56,9 @@ from associative import AssociativeMemory, AssociativeMemorySystem
 gettext.install('eam', localedir=None, codeset=None, names=None)
 
 
-def plot_pre_graph(pre_mean, rec_mean, acc_mean, ent_mean,
-                   pre_std, rec_std, acc_std, ent_std, es, tag='',
-                   xlabels=constants.memory_sizes, xtitle=None,
-                   ytitle=None):
+def plot_pre_graph(pre_mean, rec_mean, ent_mean, pre_std, rec_std,
+               	   es, tag='', xlabels=constants.memory_sizes,
+                   xtitle=None, ytitle=None):
 
     plt.clf()
     plt.figure(figsize=(6.4, 4.8))
@@ -81,9 +80,6 @@ def plot_pre_graph(pre_mean, rec_mean, acc_mean, ent_mean,
 
     plt.errorbar(x, pre_mean, fmt='r-o', yerr=pre_std, label=_('Precision'))
     plt.errorbar(x, rec_mean, fmt='b--s', yerr=rec_std, label=_('Recall'))
-    if not ((acc_mean is None) or (acc_std is None)):
-        plt.errorbar(x, acc_mean, fmt='y:d', yerr=acc_std, label=_('Accuracy'))
-
     plt.xlim(0, xmax)
     plt.ylim(0, ymax)
     plt.xticks(x, xlabels)
@@ -274,7 +270,10 @@ def msize_features(features, msize, min_value, max_value):
 
 
 def rsize_recall(recall, msize, min_value, max_value):
-    return (max_value - min_value)*recall/(msize-1) + min_value
+    if (msize == 1):
+        return (recall.astype(dtype=float) + 1.0)*(max_value - min_value)/2
+    else:
+        return (max_value - min_value)*recall/(msize-1) + min_value
 
 
 TP = (0, 0)
@@ -352,8 +351,7 @@ def recognize_by_memory(eam, tef_rounded, tel, msize, minimum, maximum, classifi
         else:
             unknown += 1
     data = np.array(data)
-    print(f'Data shape: {data.shape}')
-    predictions = classifier.predict(data)
+    predictions = classifier.predict(data).astype(dtype=int)
     for correct, prediction in zip(labels, predictions):
         # For calculation of per memory precision and recall
         conftrix[correct, prediction] += 1
@@ -438,7 +436,7 @@ def get_ams_results(
 
 
 def test_memory(domain, es):
-    entropy = []
+    all_entropies = []
     precision = []
     recall = []
     all_conftrixes = []
@@ -498,7 +496,7 @@ def test_memory(domain, es):
         # Measures by memory size
 
         # Average entropy among al digits.
-        entropy.append(entropies)
+        all_entropies.append(entropies)
 
         # Average precision and recall as percentage
         precision.append(behaviours[:, constants.precision_idx]*100)
@@ -509,54 +507,43 @@ def test_memory(domain, es):
         no_correct_response.append(
             behaviours[:, constants.no_correct_response_idx])
         correct_response.append(behaviours[:, constants.correct_response_idx])
-        response_size.append(behaviours[:, constants.response_size_idx])
 
     # Every row is training fold, and every column is a memory size.
-    entropy = np.array(entropy)
+    all_entropies = np.array(all_entropies)
     precision = np.array(precision)
     recall = np.array(recall)
-    accuracy = np.array(accuracy)
     all_confrixes = np.array(all_conftrixes)
 
-    average_entropy = np.mean(entropy, axis=0)
-    stdev_entropy = np.std(entropy, axis=0)
+    average_entropy = np.mean(all_entropies, axis=0)
     average_precision = np.mean(precision, axis=0)
     stdev_precision = np.std(precision, axis=0)
     average_recall = np.mean(recall, axis=0)
     stdev_recall = np.std(recall, axis=0)
-    average_accuracy = np.mean(accuracy, axis=0)
-    stdev_accuracy = np.std(accuracy, axis=0)
     average_confrixes = np.mean(all_confrixes, axis=0)
 
     no_response = np.array(no_response)
     no_correct_response = np.array(no_correct_response)
-    no_correct_chosen = np.array(no_correct_chosen)
     correct_response = np.array(correct_response)
-    response_size = np.array(response_size)
-
     main_no_response = np.mean(no_response, axis=0)
     main_no_correct_response = np.mean(no_correct_response, axis=0)
     main_correct_response = np.mean(correct_response, axis=0)
-
     best_memory_size = optimum_memory_size(average_precision, average_recall)
     main_behaviours = \
         [main_no_response, main_no_correct_response, main_correct_response]
 
     np.savetxt(constants.csv_filename(
-        'memory_average_precision', es), precision, delimiter=',')
+        'memory_precision', es), precision, delimiter=',')
     np.savetxt(constants.csv_filename(
-        'memory_average_recall', es), recall, delimiter=',')
+        'memory_recall', es), recall, delimiter=',')
     np.savetxt(constants.csv_filename(
-        'memory_average_accuracy', es), accuracy, delimiter=',')
-    np.savetxt(constants.csv_filename(
-        'memory_average_entropy', es), entropy, delimiter=',')
+        'memory_entropy', es), all_entropies, delimiter=',')
     np.savetxt(constants.csv_filename('main_behaviours', es),
                main_behaviours, delimiter=',')
     np.save(constants.data_filename('memory_confrixes', es), average_confrixes)
     np.save(constants.data_filename('behaviours', es), behaviours)
-    plot_pre_graph(average_precision, average_recall, average_accuracy, average_entropy,
-                   stdev_precision, stdev_recall, stdev_accuracy, stdev_entropy, es)
-    plot_behs_graph(main_no_response, main_no_correct_response, main_correct_response)
+    plot_pre_graph(average_precision, average_recall, average_entropy,
+                   stdev_precision, stdev_recall, es)
+    plot_behs_graph(main_no_response, main_no_correct_response, main_correct_response, es)
     print('Memory size evaluation completed!')
     return best_memory_size
 
