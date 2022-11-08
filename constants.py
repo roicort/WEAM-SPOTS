@@ -78,7 +78,7 @@ iota_default = 0.0
 kappa_default = 0.0
 xi_default = 0.0
 sigma_default = 0.25
-params_defaults = [np.nan, iota_default, kappa_default, xi_default, sigma_default]
+params_defaults = [iota_default, kappa_default, xi_default, sigma_default]
 label_idx = 0
 iota_idx = 1
 kappa_idx = 2
@@ -116,34 +116,20 @@ class ExperimentSettings:
         if params is None:
             print('Memory parameters not provided, ' 
                 + 'so defaults are used for all memories.')
-            self.mem_params = mem_params(params_defaults)
+            self.mem_params = params_defaults
         else:
-            # If not None, it must be a one or two dimensional array.
+            # If not None, it must be a one dimensional array.
             assert(isinstance(params,np.ndarray))
-            assert(params.ndim < 3)
-            # The “second” dimension must have five elements
-            # label, iota, kappa, xi, sigma
-            n = 0 if params.ndim == 1 else 1
+            assert(params.ndim == 1)
+            # The dimension must have four elements
+            # iota, kappa, xi, sigma
             shape = params.shape
-            assert(shape[n] == 5)
-            if params.ndim == 1:
-                print('Same parameters for all memories.')
-                self.mem_params = mem_params(params)
-            else:
-                self.mem_params = params
+            assert(shape[0] == 4)
+            self.mem_params = params
 
     def __str__(self):
         s = '{Parameters: ' + str(self.mem_params) + '}'
         return s
-
-def mem_params(p):
-    params = np.zeros((n_labels, 5), dtype=float)
-    # First column is for labels
-    params[:,0] = np.array([i for i in range(n_labels)])
-    for i in range(4):
-        params[:, i+1] = np.full(n_labels, p[i+1])
-    return params
-
 
 def print_warning(*s):
     print('WARNING:', *s, file = sys.stderr)
