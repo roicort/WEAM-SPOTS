@@ -100,18 +100,13 @@ precision_idx = 0
 recall_idx = 1
 accuracy_idx = 2
 entropy_idx = 3
-n_measures = 4
-
-no_response_idx = 2
-no_correct_response_idx = 3
-no_correct_chosen_idx = 4
-correct_response_idx = 5
-response_size_idx = 6
+no_response_idx = 4
+no_correct_response_idx = 5
+correct_response_idx = 6
 n_behaviours = 7
 
 memory_sizes = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 memory_fills = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 100.0]
-ideal_memory_size = 16
 
 n_samples = 10
 learned_data_groups = 6
