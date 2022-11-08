@@ -336,7 +336,7 @@ def memory_entropy(m, memory: AssociativeMemory):
     return m, memory.entropy
 
 
-def recognize_by_memory(eam, tef_rounded, tel, classifier):
+def recognize_by_memory(eam, tef_rounded, tel, msize, minimum, maximum, classifier):
     data = []
     labels = []   
     conftrix = np.zeros(
@@ -346,10 +346,13 @@ def recognize_by_memory(eam, tef_rounded, tel, classifier):
     for features, label in zip(tef_rounded, tel):
         memory, recognized, _ = eam.recall(features)
         if recognized:
+            memory = rsize_recall(memory, msize, minimum, maximum)
             data.append(memory)
             labels.append(label)
         else:
             unknown += 1
+    data = np.array(data)
+    print(f'Data shape: {data.shape}')
     predictions = classifier.predict(data)
     for correct, prediction in zip(labels, predictions):
         # For calculation of per memory precision and recall
@@ -423,7 +426,8 @@ def get_ams_results(
         eam.register(features)
 
     # Recognize test data.
-    conftrix, behaviour = recognize_by_memory(eam, tef_rounded, tel, classifier)
+    conftrix, behaviour = recognize_by_memory(
+        eam, tef_rounded, tel, msize, min_value, max_value, classifier)
     responses = len(tel) - behaviour[constants.no_response_idx]
     precision = behaviour[constants.correct_response_idx]/float(responses)
     recall = behaviour[constants.correct_response_idx]/float(len(tel))
