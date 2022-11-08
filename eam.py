@@ -447,11 +447,10 @@ def test_memory(domain, es):
 
     # Retrieve de classifier
     model_prefix = constants.model_name(es)
-    filename = constants.classifier_filename(model_prefix, es, fold)
-    classifier = tf.keras.models.load_model(filename)
-
 
     for fold in range(constants.n_folds):
+        filename = constants.classifier_filename(model_prefix, es, fold)
+        classifier = tf.keras.models.load_model(filename)
         gc.collect()
         print(f'Fold: {fold}')
         suffix = constants.filling_suffix
