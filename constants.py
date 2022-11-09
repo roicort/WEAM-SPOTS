@@ -32,7 +32,7 @@ data_prefix = 'data'
 labels_prefix = 'labels'
 features_prefix = 'features'
 memories_prefix = 'memories'
-mem_conf_prefix = 'mem_conftrix'
+mem_conf_prefix = 'mem_confrix'
 model_prefix = 'model'
 recognition_prefix = 'recognition'
 stats_prefix = 'model_stats'
@@ -253,7 +253,7 @@ def classifier_filename(name_prefix, es, fold):
 def decoder_filename(name_prefix, es, fold):
     return filename(name_prefix + decoder_suffix, es, fold)
 
-def memory_conftrix_filename(fill, es, fold):
+def memory_confrix_filename(fill, es, fold):
     prefix = mem_conf_prefix + '-fll_' + str(fill).zfill(3)
     return data_filename(prefix, es, fold)
 

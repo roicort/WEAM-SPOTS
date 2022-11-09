@@ -266,14 +266,14 @@ def get_label(memories, weights=None, entropies=None):
 
 
 def msize_features(features, msize, min_value, max_value):
-    return np.round((msize-1)*(features-min_value) / (max_value-min_value)).astype(np.int16)
-
+    return np.round((msize-1)*(features-min_value) / (max_value-min_value)).astype(int)
 
 def rsize_recall(recall, msize, min_value, max_value):
     if (msize == 1):
         return (recall.astype(dtype=float) + 1.0)*(max_value - min_value)/2
     else:
-        return (max_value - min_value)*recall/(msize-1) + min_value
+        return (max_value - min_value)* recall.astype(dtype=float) \
+            /(msize - 1.0) + min_value
 
 
 TP = (0, 0)
@@ -338,30 +338,32 @@ def memory_entropy(m, memory: AssociativeMemory):
 def recognize_by_memory(eam, tef_rounded, tel, msize, minimum, maximum, classifier):
     data = []
     labels = []   
-    conftrix = np.zeros(
+    confrix = np.zeros(
         (constants.n_labels, constants.n_labels), dtype='int')
     behaviour = np.zeros(constants.n_behaviours, dtype=np.float64)
     unknown = 0
     for features, label in zip(tef_rounded, tel):
         memory, recognized, _ = eam.recall(features)
         if recognized:
-            memory = rsize_recall(memory, msize, minimum, maximum)
-            data.append(memory)
+            mem = rsize_recall(memory, msize, minimum, maximum)
+            data.append(mem)
             labels.append(label)
         else:
             unknown += 1
     data = np.array(data)
-    predictions = classifier.predict(data).astype(dtype=int)
+    predictions = np.argmax(classifier.predict(data), axis=1)
     for correct, prediction in zip(labels, predictions):
         # For calculation of per memory precision and recall
-        conftrix[correct, prediction] += 1
+        confrix[correct, prediction] += 1
     behaviour[constants.no_response_idx] = unknown
     behaviour[constants.correct_response_idx] = \
-        np.sum([conftrix[i,i] for i in range(constants.n_labels)])
+        np.sum([confrix[i,i] for i in range(constants.n_labels)])
 
     behaviour[constants.no_correct_response_idx] = \
         len(tel) - unknown - behaviour[constants.correct_response_idx]
-    return conftrix, behaviour
+    print(confrix)
+    print(behaviour)
+    return confrix, behaviour
 
 
 def split_by_label(fl_pairs):
@@ -395,22 +397,17 @@ def optimum_memory_size(precisions, recalls):
 
 
 def get_ams_results(
-    midx, msize, domain, trf, tef, trl, tel, classifier, es, fold):
+        midx, msize, domain, trf, tef, trl, tel, classifier, es, fold):
     # Round the values
     max_value = trf.max()
     other_value = tef.max()
     max_value = max_value if max_value > other_value else other_value
-
     min_value = trf.min()
     other_value = tef.min()
     min_value = min_value if min_value < other_value else other_value
 
     trf_rounded = msize_features(trf, msize, min_value, max_value)
     tef_rounded = msize_features(tef, msize, min_value, max_value)
-
-    n_labels = constants.n_labels
-    n_mems = n_labels
-
     behaviour = np.zeros(constants.n_behaviours, dtype=np.float64)
 
     # Create the memory.
@@ -424,7 +421,7 @@ def get_ams_results(
         eam.register(features)
 
     # Recognize test data.
-    conftrix, behaviour = recognize_by_memory(
+    confrix, behaviour = recognize_by_memory(
         eam, tef_rounded, tel, msize, min_value, max_value, classifier)
     responses = len(tel) - behaviour[constants.no_response_idx]
     precision = behaviour[constants.correct_response_idx]/float(responses)
@@ -432,14 +429,14 @@ def get_ams_results(
     behaviour[constants.precision_idx] = precision
     behaviour[constants.recall_idx] = recall
 
-    return midx, eam.entropy, behaviour, conftrix
+    return midx, eam.entropy, behaviour, confrix
 
 
 def test_memory(domain, es):
     all_entropies = []
     precision = []
     recall = []
-    all_conftrixes = []
+    all_confrixes = []
 
     no_response = []
     no_correct_response = []
@@ -479,7 +476,7 @@ def test_memory(domain, es):
         behaviours = np.zeros(
             (len(constants.memory_sizes), constants.n_behaviours))
         measures = []
-        conftrixes = []
+        confrixes = []
         entropies = []
         for midx, msize in enumerate(constants.memory_sizes):
             print(f'Memory size: {msize}')
@@ -487,10 +484,10 @@ def test_memory(domain, es):
                 filling_features, testing_features,
                 filling_labels, testing_labels, classifier, es, fold)
             measures.append(results)
-        for midx, entropy, behaviour, conftrix in measures:
+        for midx, entropy, behaviour, confrix in measures:
             entropies.append(entropy)
             behaviours[midx, :] = behaviour
-            conftrixes.append(conftrix)
+            confrixes.append(confrix)
 
         ###################################################################3##
         # Measures by memory size
@@ -502,7 +499,7 @@ def test_memory(domain, es):
         precision.append(behaviours[:, constants.precision_idx]*100)
         recall.append(behaviours[:, constants.recall_idx]*100)
 
-        all_conftrixes.append(np.array(conftrixes))
+        all_confrixes.append(np.array(confrixes))
         no_response.append(behaviours[:, constants.no_response_idx])
         no_correct_response.append(
             behaviours[:, constants.no_correct_response_idx])
@@ -512,7 +509,7 @@ def test_memory(domain, es):
     all_entropies = np.array(all_entropies)
     precision = np.array(precision)
     recall = np.array(recall)
-    all_confrixes = np.array(all_conftrixes)
+    all_confrixes = np.array(all_confrixes)
 
     average_entropy = np.mean(all_entropies, axis=0)
     average_precision = np.mean(precision, axis=0)
@@ -645,7 +642,7 @@ def get_recalls(ams, msize, domain, min_value, max_value, trf, trl, tef, tel, es
         total_precision = cmatrix[TP] / positives
     total_recall = cmatrix[TP] / len(tel)
     mismatches /= len(tel)
-    filename = constants.memory_conftrix_filename(percent, es, fold)
+    filename = constants.memory_confrix_filename(percent, es, fold)
     np.save(filename, cms)
     return measures, total_precision, total_recall, mismatches
 
@@ -936,9 +933,9 @@ def characterize_features(es):
 def run_evaluation(es):
     best_memory_size = test_memory(constants.domain, es)
     print(f'Best memory size: {best_memory_size}')
-    best_filling_percent = test_recalling(
-        constants.domain, best_memory_size, es)
-    save_learned_params(best_memory_size, best_filling_percent, es)
+    # best_filling_percent = test_recalling(
+    #     constants.domain, best_memory_size, es)
+    # save_learned_params(best_memory_size, best_filling_percent, es)
 
 
 def generate_output(es):
