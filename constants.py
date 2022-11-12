@@ -106,7 +106,7 @@ n_behaviours = 7
 
 memory_sizes = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 memory_fills = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 100.0]
-
+n_best_memory_sizes = 3
 n_samples = 10
 learned_data_groups = 6
 

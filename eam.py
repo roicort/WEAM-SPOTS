@@ -32,6 +32,7 @@ Options:
 The parameter <stage> indicates the stage of learning from which data is used.
 """
 
+import typing
 import seaborn
 import json
 import random
@@ -42,6 +43,9 @@ import numpy as np
 import tensorflow as tf
 from itertools import islice
 import gettext
+if typing.TYPE_CHECKING:
+    def _(message):
+        pass
 import gc
 from docopt import docopt
 import sys
@@ -383,17 +387,19 @@ def split_every(n, iterable):
         piece = list(islice(i, n))
 
 
-def optimum_memory_size(precisions, recalls):
-    f1 = 0.0
-    idx = 0
+def _get_f1(t):
+  return t[0]
+
+def optimum_memory_sizes(precisions, recalls):
+    f1s = []
     i = 0
     for p, r in zip(precisions, recalls):
-        new_f1 = 0 if (r+p) == 0 else 2*(r*p)/(r+p)
-        if new_f1 - f1 > 0.01:
-            f1 = new_f1
-            idx = i
+        f1 = 0 if (r+p) == 0 else 2*(r*p)/(r+p)
+        f1s.append(tuple(f1, i))
         i += 1
-    return constants.memory_sizes[idx]
+    f1s.sort(reverse = True, key = _get_f1)
+    return [constants.memory_sizes[t[1]] 
+        for t in f1s[:constants.n_best_memory_sizes]]
 
 
 def get_ams_results(
@@ -428,11 +434,10 @@ def get_ams_results(
     recall = behaviour[constants.correct_response_idx]/float(len(tel))
     behaviour[constants.precision_idx] = precision
     behaviour[constants.recall_idx] = recall
-
     return midx, eam.entropy, behaviour, confrix
 
 
-def test_memory(domain, es):
+def test_memory_sizes(domain, es):
     all_entropies = []
     precision = []
     recall = []
@@ -448,9 +453,9 @@ def test_memory(domain, es):
     model_prefix = constants.model_name(es)
 
     for fold in range(constants.n_folds):
+        gc.collect()
         filename = constants.classifier_filename(model_prefix, es, fold)
         classifier = tf.keras.models.load_model(filename)
-        gc.collect()
         print(f'Fold: {fold}')
         suffix = constants.filling_suffix
         filling_features_filename = constants.features_name(es) + suffix
@@ -524,7 +529,7 @@ def test_memory(domain, es):
     main_no_response = np.mean(no_response, axis=0)
     main_no_correct_response = np.mean(no_correct_response, axis=0)
     main_correct_response = np.mean(correct_response, axis=0)
-    best_memory_size = optimum_memory_size(average_precision, average_recall)
+    best_memory_sizes = optimum_memory_sizes(average_precision, average_recall)
     main_behaviours = \
         [main_no_response, main_no_correct_response, main_correct_response]
 
@@ -542,120 +547,34 @@ def test_memory(domain, es):
                    stdev_precision, stdev_recall, es)
     plot_behs_graph(main_no_response, main_no_correct_response, main_correct_response, es)
     print('Memory size evaluation completed!')
-    return best_memory_size
+    return best_memory_sizes
 
 
-def remember_by_memory(fl_pairs, ams, entropy):
-    n_mems = constants.n_labels
-    cms = np.zeros((n_mems, 2, 2), dtype='int')
-    cmatrix = np.zeros((2, 2), dtype='int')
-    mismatches = 0
-    for features, label in fl_pairs:
-        mismatches += ams[label].mismatches(features)
-        memories = []
-        weights = {}
-        for k in ams:
-            recognized, weight = ams[k].recognize(features)
-            if recognized:
-                memories.append(k)
-                weights[k] = weight
-            # For calculation of per memory precision and recall
-            cms[k][TP] += (k == label) and recognized
-            cms[k][FP] += (k != label) and recognized
-            cms[k][TN] += not ((k == label) or recognized)
-            cms[k][FN] += (k == label) and not recognized
-        if (len(memories) == 0):
-            cmatrix[FN] += 1
-        else:
-            l = get_label(memories, weights, entropy)
-            if l == label:
-                cmatrix[TP] += 1
-            else:
-                cmatrix[FP] += 1
-    return mismatches, cms, cmatrix
-
-
-def get_recalls(ams, msize, domain, min_value, max_value, trf, trl, tef, tel, es, fold, percent):
-    n_mems = constants.n_labels
-
-    # To store precisión, recall, accuracy and entropies
-    measures = np.zeros(constants.n_measures, dtype=np.float64)
-    entropy = np.zeros(n_mems, dtype=np.float64)
-
-    # Confusion matrix for calculating precision, recall and accuracy
-    # per memory.
-    cms = np.zeros((n_mems, 2, 2))
-    TP = (0, 0)
-    FP = (0, 1)
-    FN = (1, 0)
-    TN = (1, 1)
-
-    # Confusion matrix for calculating overall precision and recall.
-    cmatrix = np.zeros((2, 2))
-
-    # Registration in parallel, per label.
-    Parallel(n_jobs=constants.n_jobs, require='sharedmem', verbose=50)(
-        delayed(register_in_memory)(ams[label], features_list)
-        for label, features_list in split_by_label(zip(trf, trl)))
-
+def tes_filling_percent(
+        eam, msize, domain, min_value, max_value,
+        trf, trl, tef, tel, es, fold, percent, classifier):
+    # Registrate filling data.
+    for features in trf:
+        eam.register(features)
     print(f'Filling of memories done for idx {fold}')
+    _, behaviour = recognize_by_memory(
+        eam, tef, tel, msize, min_value, max_value, classifier)
+    responses = len(tel) - behaviour[constants.no_response_idx]
+    precision = behaviour[constants.correct_response_idx]/float(responses)
+    recall = behaviour[constants.correct_response_idx]/float(len(tel))
+    behaviour[constants.precision_idx] = precision
+    behaviour[constants.recall_idx] = recall
+    return behaviour, eam.entropy
 
-    # Calculate entropies
-    means = []
-    for m in ams:
-        entropy[m] = ams[m].entropy
-        means.append(ams[m].mean)
-
-    # Total number of differences between features and memories.
-    mismatches = 0
-    split_size = 500
-    for mmatches, scms, cmatx in \
-        Parallel(n_jobs=constants.n_jobs, verbose=50)(
-            delayed(remember_by_memory)(fl_pairs, ams, entropy)
-            for fl_pairs in split_every(split_size, zip(tef, tel))):
-        mismatches += mmatches
-        cms = cms + scms
-        cmatrix = cmatrix + cmatx
-    positives = conf_sum(cms, TP) + conf_sum(cms, FP)
-    details = True
-    if positives == 0:
-        print('No memory responded')
-        measures[constants.precision_idx] = 1.0
-        details = False
-    else:
-        measures[constants.precision_idx] = memories_precision(cms)
-    measures[constants.recall_idx] = memories_recall(cms)
-    measures[constants.accuracy_idx] = memories_accuracy(cms)
-    measures[constants.entropy_idx] = np.mean(entropy)
-
-    if details:
-        for i in range(n_mems):
-            positives = cms[i][TP] + cms[i][FP]
-            if positives == 0:
-                print(
-                    f'Memory {i} filled with {percent}% in fold {fold} did not respond.')
-    positives = cmatrix[TP] + cmatrix[FP]
-    if positives == 0:
-        print(f'System filled with {percent} in fold {fold} did not respond.')
-        total_precision = 1.0
-    else:
-        total_precision = cmatrix[TP] / positives
-    total_recall = cmatrix[TP] / len(tel)
-    mismatches /= len(tel)
-    filename = constants.memory_confrix_filename(percent, es, fold)
-    np.save(filename, cms)
-    return measures, total_precision, total_recall, mismatches
-
-
-def test_recalling_fold(n_memories, mem_size, domain, es, fold):
+def test_filling_per_fold(mem_size, domain, es, fold):
     # Create the required associative memories.
-    ams = dict.fromkeys(range(n_memories))
     p = es.mem_params
-    for m in ams:
-        ams[m] = AssociativeMemory(domain, mem_size, p[m, constants.xi_idx],
-                                   p[m, constants.sigma_idx], p[m,
-                                                                constants.iota_idx],
-                                   p[m, constants.kappa_idx])
+    ams = AssociativeMemory(
+        domain, mem_size, p[constants.xi_idx],
+        p[constants.sigma_idx], p[constants.iota_idx], p[constants.kappa_idx])
+    model_prefix = constants.model_name(es)
+    filename = constants.classifier_filename(model_prefix, es, fold)
+    classifier = tf.keras.models.load_model(filename)
 
     suffix = constants.filling_suffix
     filling_features_filename = constants.features_name(es) + suffix
@@ -682,10 +601,8 @@ def test_recalling_fold(n_memories, mem_size, domain, es, fold):
     testing_max = testing_features.max()
     fillin_min = filling_features.min()
     testing_min = testing_features.min()
-
     maximum = filling_max if filling_max > testing_max else testing_max
     minimum = fillin_min if fillin_min < testing_min else testing_min
-
     filling_features = msize_features(
         filling_features, mem_size, minimum, maximum)
     testing_features = msize_features(
@@ -698,32 +615,24 @@ def test_recalling_fold(n_memories, mem_size, domain, es, fold):
     fold_entropies = []
     fold_precision = []
     fold_recall = []
-    fold_accuracy = []
-    total_precisions = []
-    total_recalls = []
-    mismatches = []
 
     start = 0
     for percent, end in zip(percents, steps):
         features = filling_features[start:end]
         labels = filling_labels[start:end]
 
-        # recalls, measures, step_precision, step_recall, mis_count = get_recalls(ams, mem_size, domain, \
-        measures, step_precision, step_recall, mis_count = get_recalls(ams, mem_size, domain,
-                                                                       minimum, maximum, features, labels, testing_features, testing_labels, es, fold, percent)
+        behaviour, entropy = \
+            tes_filling_percent(ams, mem_size, domain,
+                minimum, maximum, features, labels,
+                testing_features, testing_labels, es, fold, percent, classifier)
 
         # A list of tuples (position, label, features)
         # fold_recalls += recalls
         # An array with average entropy per step.
-        fold_entropies.append(measures[constants.entropy_idx])
-        # Arrays with precision, recall and accuracy per step
-        fold_precision.append(measures[constants.precision_idx])
-        fold_recall.append(measures[constants.recall_idx])
-        fold_accuracy.append(measures[constants.accuracy_idx])
-        # Overall recalls and precisions per step
-        total_recalls.append(step_recall)
-        total_precisions.append(step_precision)
-        mismatches.append(mis_count)
+        fold_entropies.append(entropy)
+        # Arrays with precision, and recall.
+        fold_precision.append(behaviour[constants.precision_idx])
+        fold_recall.append(behaviour[constants.recall_idx])
         start = end
     # Use this to plot current state of memories
     # as heatmaps.
@@ -731,94 +640,69 @@ def test_recalling_fold(n_memories, mem_size, domain, es, fold):
     fold_entropies = np.array(fold_entropies)
     fold_precision = np.array(fold_precision)
     fold_recall = np.array(fold_recall)
-    fold_accuracy = np.array(fold_accuracy)
-    total_precisions = np.array(total_precisions)
-    total_recalls = np.array(total_recalls)
-    mismatches = np.array(mismatches)
-    return fold, fold_entropies, fold_precision, \
-        fold_recall, fold_accuracy, total_precisions, total_recalls, mismatches
+    return fold, fold_entropies, fold_precision, fold_recall
 
 
-def test_recalling(domain, mem_size, es):
-    n_memories = constants.n_labels
+def test_memory_fills(domain, mem_sizes, es):
     memory_fills = constants.memory_fills
     testing_folds = constants.n_folds
-    # All recalls, per memory fill and fold.
-    # all_memories = {}
-    # All entropies, precision, and recall, per fold, and fill.
-    total_entropies = np.zeros((testing_folds, len(memory_fills)))
-    total_precisions = np.zeros((testing_folds, len(memory_fills)))
-    total_recalls = np.zeros((testing_folds, len(memory_fills)))
-    total_accuracies = np.zeros((testing_folds, len(memory_fills)))
-    sys_precisions = np.zeros((testing_folds, len(memory_fills)))
-    sys_recalls = np.zeros((testing_folds, len(memory_fills)))
-    total_mismatches = np.zeros((testing_folds, len(memory_fills)))
+    best_filling_percents = []
+    for mem_size in mem_sizes:
+        # All entropies, precision, and recall, per size, fold, and fill.
+        total_entropies = np.zeros((testing_folds, len(memory_fills)))
+        total_precisions = np.zeros((testing_folds, len(memory_fills)))
+        total_recalls = np.zeros((testing_folds, len(memory_fills)))
+        list_results = []
 
-    list_results = []
-    for fold in range(testing_folds):
-        results = test_recalling_fold(n_memories, mem_size, domain, es, fold)
-        list_results.append(results)
-    # for fold, memories, entropy, precision, recall, accuracy, \
-    for fold, entropy, precision, recall, accuracy, \
-            sys_precision, sys_recall, mismatches in list_results:
-        # all_memories[fold] = memories
-        total_precisions[fold] = precision
-        total_recalls[fold] = recall
-        total_accuracies[fold] = accuracy
-        total_mismatches[fold] = mismatches
-        total_entropies[fold] = entropy
-        sys_precisions[fold] = sys_precision
-        sys_recalls[fold] = sys_recall
-    main_avrge_entropies = np.mean(total_entropies, axis=0)
-    main_stdev_entropies = np.std(total_entropies, axis=0)
-    main_avrge_mprecision = np.mean(total_precisions, axis=0)
-    main_stdev_mprecision = np.std(total_precisions, axis=0)
-    main_avrge_mrecall = np.mean(total_recalls, axis=0)
-    main_stdev_mrecall = np.std(total_recalls, axis=0)
-    main_avrge_maccuracy = np.mean(total_accuracies, axis=0)
-    main_stdev_maccuracy = np.std(total_accuracies, axis=0)
-    main_avrge_sys_precision = np.mean(sys_precisions, axis=0)
-    main_stdev_sys_precision = np.std(sys_precisions, axis=0)
-    main_avrge_sys_recall = np.mean(sys_recalls, axis=0)
-    main_stdev_sys_recall = np.std(sys_recalls, axis=0)
+        for fold in range(testing_folds):
+            results = test_filling_per_fold(mem_size, domain, es, fold)
+            list_results.append(results)
+        for fold, entropies, precisions, recalls in list_results:
+            total_precisions[fold] = precisions
+            total_recalls[fold] = recalls
+            total_entropies[fold] = entropies
 
-    np.savetxt(constants.csv_filename('main_average_precision', es),
-               main_avrge_mprecision, delimiter=',')
-    np.savetxt(constants.csv_filename('main_average_recall', es),
-               main_avrge_mrecall, delimiter=',')
-    np.savetxt(constants.csv_filename('main_average_accuracy', es),
-               main_avrge_maccuracy, delimiter=',')
-    np.savetxt(constants.csv_filename('main_average_entropy', es),
-               main_avrge_entropies, delimiter=',')
-    np.savetxt(constants.csv_filename('main_stdev_precision', es),
-               main_stdev_mprecision, delimiter=',')
-    np.savetxt(constants.csv_filename('main_stdev_recall', es),
-               main_stdev_mrecall, delimiter=',')
-    np.savetxt(constants.csv_filename('main_stdev_accuracy', es),
-               main_stdev_maccuracy, delimiter=',')
-    np.savetxt(constants.csv_filename('main_stdev_entropy', es),
-               main_stdev_entropies, delimiter=',')
-    np.savetxt(constants.csv_filename('main_total_recalls', es),
-               main_avrge_sys_recall, delimiter=',')
-    np.savetxt(constants.csv_filename('main_total_precision', es),
-               main_avrge_sys_precision, delimiter=',')
-    np.savetxt(constants.csv_filename('main_total_mismatches', es),
-               total_mismatches, delimiter=',')
+        main_avrge_entropies = np.mean(total_entropies, axis=0)
+        main_stdev_entropies = np.std(total_entropies, axis=0)
+        main_avrge_precisions = np.mean(total_precisions, axis=0)
+        main_stdev_precisions = np.std(total_precisions, axis=0)
+        main_avrge_recalls = np.mean(total_recalls, axis=0)
+        main_stdev_recalls = np.std(total_recalls, axis=0)
 
-    plot_pre_graph(main_avrge_mprecision*100, main_avrge_mrecall*100, main_avrge_maccuracy*100, main_avrge_entropies,
-                   main_stdev_mprecision*100, main_stdev_mrecall *
-                   100, main_stdev_maccuracy*100, main_stdev_entropies, es, 'recall-',
-                   xlabels=constants.memory_fills, xtitle=_('Percentage of memory corpus'))
-    plot_pre_graph(main_avrge_sys_precision*100, main_avrge_sys_recall*100, None, main_avrge_entropies,
-                   main_stdev_sys_precision*100, main_stdev_sys_recall *
-                   100, None, main_stdev_entropies, es, 'total_recall-',
-                   xlabels=constants.memory_fills, xtitle=_('Percentage of memory corpus'))
+        np.savetxt(
+            constants.csv_filename(
+                'main_average_precision' + constants.numeric_suffix('sze', mem_size), es),
+            main_avrge_precisions, delimiter=',')
+        np.savetxt(
+            constants.csv_filename(
+                'main_average_recall' + constants.numeric_suffix('sze', mem_size), es),
+            main_avrge_recalls, delimiter=',')
+        np.savetxt(
+            constants.csv_filename(
+                'main_average_entropy' + constants.numeric_suffix('sze', mem_size), es),
+            main_avrge_entropies, delimiter=',')
+        np.savetxt(
+            constants.csv_filename(
+                'main_stdev_precision' + constants.numeric_suffix('sze', mem_size), es),
+            main_stdev_precisions, delimiter=',')
+        np.savetxt(
+            constants.csv_filename(
+                'main_stdev_recall' + constants.numeric_suffix('sze', mem_size), es),
+            main_stdev_recalls, delimiter=',')
+        np.savetxt(
+            constants.csv_filename(
+                'main_stdev_entropy' + constants.numeric_suffix('sze', mem_size), es),
+            main_stdev_entropies, delimiter=',')
 
-    bfp = best_filling_percentage(
-        main_avrge_sys_precision, main_avrge_sys_recall)
-    print('Best filling percent: ' + str(bfp))
-    print('Filling evaluation completed!')
-    return bfp
+        plot_pre_graph(main_avrge_precisions*100, main_avrge_recalls*100, main_avrge_entropies,
+                    main_stdev_precisions*100, main_stdev_recalls *
+                    100, main_stdev_entropies, es, 'recall' + constants.numeric_suffix('sze', mem_size),
+                    xlabels=constants.memory_fills, xtitle=_('Percentage of memory corpus'))
+
+        bfp = best_filling_percentage(
+            main_avrge_precisions, main_avrge_recalls)
+        best_filling_percents.append(bfp)
+    return best_filling_percents
 
 
 def best_filling_percentage(precisions, recalls):
@@ -869,10 +753,10 @@ def save_conf_matrix(matrix, prefix, es):
     np.save(filename, matrix)
 
 
-def save_learned_params(mem_size, fill_percent, es):
+def save_learned_params(mem_sizes, fill_percents, es):
     name = constants.learn_params_name(es)
     filename = constants.data_filename(name, es)
-    np.save(filename, np.array([mem_size, fill_percent], dtype=int))
+    np.save(filename, np.array([mem_sizes, fill_percents], dtype=int))
 
 
 ##############################################################################
@@ -931,11 +815,11 @@ def characterize_features(es):
 
 
 def run_evaluation(es):
-    best_memory_size = test_memory(constants.domain, es)
-    print(f'Best memory size: {best_memory_size}')
-    # best_filling_percent = test_recalling(
-    #     constants.domain, best_memory_size, es)
-    # save_learned_params(best_memory_size, best_filling_percent, es)
+    best_memory_sizes = test_memory_sizes(constants.domain, es)
+    print(f'Best memory sizes: {best_memory_sizes}')
+    best_filling_percents = test_memory_fills(
+        constants.domain, best_memory_sizes, es)
+    save_learned_params(best_memory_sizes, best_filling_percents, es)
 
 
 def generate_output(es):
