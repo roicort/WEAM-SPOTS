@@ -151,14 +151,17 @@ def print_counter(n, every, step = 1, symbol = '.', prefix = ''):
 def extended_suffix(extended):
     return '-ext' if extended else ''
 
+def numeric_suffix(prefix, value):
+    return '-' + prefix + '_' + str(value).zfill(3)
+
 def fold_suffix(fold):
-    return '' if fold is None else '-fld_' + str(fold).zfill(3)
+    return '' if fold is None else numeric_suffix('fld', fold)
 
 def learned_suffix(learned):
-    return '-lrn_' + str(learned).zfill(3)
+    return numeric_suffix('lrn', learned)
 
 def stage_suffix(stage):
-    return '-stg_' + str(stage).zfill(3)
+    return numeric_suffix('stg', stage)
 
 def get_name_w_suffix(prefix):
     suffix = ''
@@ -254,7 +257,7 @@ def decoder_filename(name_prefix, es, fold):
     return filename(name_prefix + decoder_suffix, es, fold)
 
 def memory_confrix_filename(fill, es, fold):
-    prefix = mem_conf_prefix + '-fll_' + str(fill).zfill(3)
+    prefix = mem_conf_prefix + numeric_suffix('fll', fill)
     return data_filename(prefix, es, fold)
 
 def recog_filename(name_prefix, es, fold):
