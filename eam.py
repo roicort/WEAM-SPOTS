@@ -27,7 +27,7 @@ Options:
   -e        Run the experiment (options 1 or 2).
   -o        Generate images from testing data and memories.
   --runpath=<runpath>           Sets the path to the directory where everything will be saved [default: runs]
-  -l        Chooses Language for graphs.            
+  -l        Chooses Language for graphs.
 
 The parameter <stage> indicates the stage of learning from which data is used.
 """
@@ -341,7 +341,7 @@ def memory_entropy(m, memory: AssociativeMemory):
 
 def recognize_by_memory(eam, tef_rounded, tel, msize, minimum, maximum, classifier):
     data = []
-    labels = []   
+    labels = []
     confrix = np.zeros(
         (constants.n_labels, constants.n_labels), dtype='int')
     behaviour = np.zeros(constants.n_behaviours, dtype=np.float64)
@@ -398,7 +398,7 @@ def optimum_memory_sizes(precisions, recalls):
         f1s.append(tuple(f1, i))
         i += 1
     f1s.sort(reverse = True, key = _get_f1)
-    return [constants.memory_sizes[t[1]] 
+    return [constants.memory_sizes[t[1]]
         for t in f1s[:constants.n_best_memory_sizes]]
 
 
