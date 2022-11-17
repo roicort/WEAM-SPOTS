@@ -863,7 +863,7 @@ def generate_memories(es):
     decode_test_features(es)
     learned = load_learned_params(es)
     for msize, mfill in learned:
-        remember(msize, mfill)
+        remember(msize, mfill, es)
         decode_memories(msize, es)
 
 
