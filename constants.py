@@ -166,7 +166,11 @@ def float_suffix(x, prefix=None):
 def extended_suffix(extended):
     return '-ext' if extended else ''
 
+def numeric_suffix(prefix, value):
+    return '-' + prefix + '_' + str(value).zfill(3)
+
 def fold_suffix(fold):
+<<<<<<< HEAD
     return '' if fold is None else int_suffix(fold, 'fld')
 
 def learned_suffix(learned):
@@ -180,6 +184,15 @@ def msize_suffix(msize):
 
 def sigma_suffix(sigma):
     return float_suffix(sigma, 'sgm')
+=======
+    return '' if fold is None else numeric_suffix('fld', fold)
+
+def learned_suffix(learned):
+    return numeric_suffix('lrn', learned)
+
+def stage_suffix(stage):
+    return numeric_suffix('stg', stage)
+>>>>>>> 14932696518c99a17a562c71f859548005123f9c
 
 def get_name_w_suffix(prefix):
     suffix = ''
@@ -281,7 +294,11 @@ def decoder_filename(name_prefix, es, fold):
     return filename(name_prefix + decoder_suffix, es, fold)
 
 def memory_confrix_filename(fill, es, fold):
+<<<<<<< HEAD
     prefix = mem_conf_prefix + int_suffix(fill, 'fll')
+=======
+    prefix = mem_conf_prefix + numeric_suffix('fll', fill)
+>>>>>>> 14932696518c99a17a562c71f859548005123f9c
     return data_filename(prefix, es, fold)
 
 def recog_filename(name_prefix, es, fold):

@@ -304,8 +304,8 @@ def recognize_by_memory(eam, tef_rounded, tel, msize, minimum, maximum, classifi
 
     behaviour[constants.no_correct_response_idx] = \
         len(tel) - unknown - behaviour[constants.correct_response_idx]
-    print(confrix)
-    print(behaviour)
+    print(f'Confusion matrix:\n{confrix}')
+    print(f'Behaviour: {behaviour}')
     return confrix, behaviour
 
 
@@ -325,17 +325,30 @@ def split_every(n, iterable):
         yield piece
         piece = list(islice(i, n))
 
+<<<<<<< HEAD
 def optimum_memory_sizes(precisions, recalls):
+=======
+
+def _get_f1(t):
+  return t[0]
+
+def optimum_indexes(precisions, recalls):
+>>>>>>> 14932696518c99a17a562c71f859548005123f9c
     f1s = []
     i = 0
     for p, r in zip(precisions, recalls):
         f1 = 0 if (r+p) == 0 else 2*(r*p)/(r+p)
         f1s.append((f1, i))
         i += 1
+<<<<<<< HEAD
     f1s.sort(reverse = True, key = lambda t : t[0])
     return [constants.memory_sizes[t[1]]
         for t in f1s[:constants.n_best_memory_sizes]]
 
+=======
+    f1s.sort(reverse = True, key = _get_f1)
+    return [t[1] for t in f1s[:constants.n_best_memory_sizes]]
+>>>>>>> 14932696518c99a17a562c71f859548005123f9c
 
 def get_ams_results(
         midx, msize, domain, trf, tef, trl, tel, classifier, es, fold):
@@ -460,7 +473,8 @@ def test_memory_sizes(domain, es):
     main_no_response = np.mean(no_response, axis=0)
     main_no_correct_response = np.mean(no_correct_response, axis=0)
     main_correct_response = np.mean(correct_response, axis=0)
-    best_memory_sizes = optimum_memory_sizes(average_precision, average_recall)
+    best_memory_idx = optimum_indexes(average_precision, average_recall)
+    best_memory_sizes = [constants.memory_sizes[i] for i in best_memory_idx]
     main_behaviours = \
         [main_no_response, main_no_correct_response, main_correct_response]
 
@@ -481,13 +495,13 @@ def test_memory_sizes(domain, es):
     return best_memory_sizes
 
 
-def tes_filling_percent(
-        eam, msize, domain, min_value, max_value,
-        trf, trl, tef, tel, es, fold, percent, classifier):
+def test_filling_percent(
+        eam, msize, min_value, max_value,
+        trf, tef, tel, percent, classifier):
     # Registrate filling data.
     for features in trf:
         eam.register(features)
-    print(f'Filling of memories done for idx {fold}')
+    print(f'Filling of memories done at {percent}%')
     _, behaviour = recognize_by_memory(
         eam, tef, tel, msize, min_value, max_value, classifier)
     responses = len(tel) - behaviour[constants.no_response_idx]
@@ -500,7 +514,7 @@ def tes_filling_percent(
 def test_filling_per_fold(mem_size, domain, es, fold):
     # Create the required associative memories.
     p = es.mem_params
-    ams = AssociativeMemory(
+    eam = AssociativeMemory(
         domain, mem_size, p[constants.xi_idx],
         p[constants.sigma_idx], p[constants.iota_idx], p[constants.kappa_idx])
     model_prefix = constants.model_name(es)
@@ -528,12 +542,25 @@ def test_filling_per_fold(mem_size, domain, es, fold):
     testing_features = np.load(testing_features_filename)
     testing_labels = np.load(testing_labels_filename)
 
+<<<<<<< HEAD
     max_value = maximum((filling_features, testing_features))
     min_value = minimum((filling_features, testing_features))
     filling_features = msize_features(
         filling_features, mem_size, min_value, max_value)
     testing_features = msize_features(
         testing_features, mem_size, min_value, max_value)
+=======
+    filling_min = filling_features.min()
+    testing_min = testing_features.min()
+    filling_max = filling_features.max()
+    testing_max = testing_features.max()
+    minimum = filling_min if filling_min < testing_min else testing_min
+    maximum = filling_max if filling_max > testing_max else testing_max
+    filling_rounded = msize_features(
+        filling_features, mem_size, minimum, maximum)
+    testing_rounded = msize_features(
+        testing_features, mem_size, minimum, maximum)
+>>>>>>> 14932696518c99a17a562c71f859548005123f9c
 
     total = len(filling_labels)
     percents = np.array(constants.memory_fills)
@@ -545,13 +572,18 @@ def test_filling_per_fold(mem_size, domain, es, fold):
 
     start = 0
     for percent, end in zip(percents, steps):
-        features = filling_features[start:end]
-        labels = filling_labels[start:end]
-
+        features = filling_rounded[start:end]
+        print(f'Filling from {start} to {end}.')
         behaviour, entropy = \
+<<<<<<< HEAD
             tes_filling_percent(ams, mem_size, domain,
                 min_value, max_value, features, labels,
                 testing_features, testing_labels, es, fold, percent, classifier)
+=======
+            test_filling_percent(
+                eam, mem_size, minimum, maximum, features,
+                testing_rounded, testing_labels, percent, classifier)
+>>>>>>> 14932696518c99a17a562c71f859548005123f9c
 
         # A list of tuples (position, label, features)
         # fold_recalls += recalls
@@ -567,6 +599,7 @@ def test_filling_per_fold(mem_size, domain, es, fold):
     fold_entropies = np.array(fold_entropies)
     fold_precision = np.array(fold_precision)
     fold_recall = np.array(fold_recall)
+    print(f'Filling test completed for fold {fold}')
     return fold, fold_entropies, fold_precision, fold_recall
 
 
@@ -623,26 +656,14 @@ def test_memory_fills(domain, mem_sizes, es):
 
         plot_pre_graph(main_avrge_precisions*100, main_avrge_recalls*100, main_avrge_entropies,
                     main_stdev_precisions*100, main_stdev_recalls *
-                    100, main_stdev_entropies, es, 'recall' + constants.numeric_suffix('sze', mem_size),
+                    100, es, 'recall' + constants.numeric_suffix('sze', mem_size),
                     xlabels=constants.memory_fills, xtitle=_('Percentage of memory corpus'))
 
-        bfp = best_filling_percentage(
+        bf_idx = optimum_indexes(
             main_avrge_precisions, main_avrge_recalls)
-        best_filling_percents.append(bfp)
+        best_filling_percents.append(constants.memory_fills[bf_idx[0]])
+        print(f'Testing fillings for memory size {mem_size} done.')
     return best_filling_percents
-
-
-def best_filling_percentage(precisions, recalls):
-    n = 0
-    i = 0
-    avg = -float('inf')
-    for precision, recall in zip(precisions, recalls):
-        new_avg = (precision + recall) / 2.0
-        if avg < new_avg:
-            n = i
-            avg = new_avg
-        i += 1
-    return constants.memory_fills[n]
 
 
 def get_all_data(prefix, es):
