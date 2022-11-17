@@ -390,16 +390,15 @@ def split_every(n, iterable):
 def _get_f1(t):
   return t[0]
 
-def optimum_memory_sizes(precisions, recalls):
+def optimum_indexes(precisions, recalls):
     f1s = []
     i = 0
     for p, r in zip(precisions, recalls):
         f1 = 0 if (r+p) == 0 else 2*(r*p)/(r+p)
-        f1s.append(tuple(f1, i))
+        f1s.append((f1, i))
         i += 1
     f1s.sort(reverse = True, key = _get_f1)
-    return [constants.memory_sizes[t[1]] 
-        for t in f1s[:constants.n_best_memory_sizes]]
+    return [t[1] for t in f1s[:constants.n_best_memory_sizes]]
 
 
 def get_ams_results(
@@ -529,7 +528,8 @@ def test_memory_sizes(domain, es):
     main_no_response = np.mean(no_response, axis=0)
     main_no_correct_response = np.mean(no_correct_response, axis=0)
     main_correct_response = np.mean(correct_response, axis=0)
-    best_memory_sizes = optimum_memory_sizes(average_precision, average_recall)
+    best_memory_idx = optimum_indexes(average_precision, average_recall)
+    best_memory_sizes = [constants.memory_sizes[i] for i in best_memory_idx]
     main_behaviours = \
         [main_no_response, main_no_correct_response, main_correct_response]
 
@@ -699,24 +699,11 @@ def test_memory_fills(domain, mem_sizes, es):
                     100, es, 'recall' + constants.numeric_suffix('sze', mem_size),
                     xlabels=constants.memory_fills, xtitle=_('Percentage of memory corpus'))
 
-        bfp = best_filling_percentage(
+        bf_idx = optimum_indexes(
             main_avrge_precisions, main_avrge_recalls)
-        best_filling_percents.append(bfp)
+        best_filling_percents.append(constants.memory_fills[bf_idx[0]])
         print(f'Testing fillings for memory size {mem_size} done.')
     return best_filling_percents
-
-
-def best_filling_percentage(precisions, recalls):
-    n = 0
-    i = 0
-    avg = -float('inf')
-    for precision, recall in zip(precisions, recalls):
-        new_avg = (precision + recall) / 2.0
-        if avg < new_avg:
-            n = i
-            avg = new_avg
-        i += 1
-    return constants.memory_fills[n]
 
 
 def get_all_data(prefix, es):
