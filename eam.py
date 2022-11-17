@@ -261,7 +261,7 @@ def maximum(arrays):
     return max
 
 def minimum(arrays):
-    min = float('-inf')
+    min = float('inf')
     for a in arrays:
         local_min = np.min(a)
         if local_min < min:
