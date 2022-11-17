@@ -687,6 +687,13 @@ def remember(msize, mfill, es):
         memories_prefix = constants.memories_name(es) + suffix
         recognition_prefix = constants.recognition_name(es) + suffix
         weights_prefix = constants.weights_name(es) + suffix
+        noised_memories_prefix = constants.noised_memories_name(es) + suffix
+        noised_recog_prefix = constants.noised_recog_name(es) + suffix
+        noised_weights_prefix = constants.noised_weights_name(es) + suffix
+        prefixes_list = [
+            [memories_prefix, recognition_prefix, weights_prefix],
+            [noised_memories_prefix, noised_recog_prefix, noised_weights_prefix]
+        ]
 
         for fold in range(constants.n_folds):
             print(f'Running remembering for fold: {fold}')
@@ -700,12 +707,19 @@ def remember(msize, mfill, es):
             testing_features_filename = constants.data_filename(
                 testing_features_filename, es, fold)
 
+            suffix = constants.noised_suffix
+            noised_features_filename = constants.features_name(es) + suffix
+            noised_features_filename = constants.data_filename(
+                noised_features_filename, es, fold)
+
             filling_features = np.load(filling_features_filename)
             testing_features = np.load(testing_features_filename)
-            max_value = maximum((filling_features, testing_features))
-            min_value = minimum((filling_features, testing_features))
+            noised_features = np.load(noised_features_filename)
+            max_value = maximum((filling_features, testing_features, noised_features))
+            min_value = minimum((filling_features, testing_features, noised_features))
             filling_rounded = msize_features(filling_features, msize, min_value, max_value)
             testing_rounded = msize_features(testing_features, msize, min_value, max_value)
+            noised_rounded = msize_features(noised_features, msize, min_value, max_value)
 
             # Create the memory and fill it
             p = es.mem_params
@@ -717,27 +731,36 @@ def remember(msize, mfill, es):
                 eam.register(features)
             print(f'Memory of size {msize} filled with {end} elements for fold {fold}')
 
-            memories_features = []
-            memories_recognition = []
-            memories_weights = []
-            for features in testing_rounded:
-                memory, recognized, weight = eam.recall(features)
-                memories_features.append(memory)
-                memories_recognition.append(recognized)
-                memories_weights.append(weight)
-
-            memories_features = np.array(memories_features, dtype = float)
-            memories_features = rsize_recall(memories_features, msize, min_value, max_value)
-            memories_recognition = np.array(memories_recognition, dtype=int)
-            memories_weights = np.array(memories_weights, dtype=float)
-
-            features_filename = constants.data_filename(memories_prefix, es, fold)
-            recognition_filename = constants.data_filename(recognition_prefix, es, fold)
-            weights_filename = constants.data_filename(weights_prefix, es, fold)
-            np.save(features_filename, memories_features)
-            np.save(recognition_filename, memories_recognition)
-            np.save(weights_filename, memories_weights)
+            for features, prefixes in zip (
+                    [testing_rounded, noised_rounded], prefixes_list)
+                save_memories(eam, features, prefixes, msize, min_value, max_value, es, fold)
     print('Remembering done!')
+
+def save_memories(eam, features, prefixes, msize, min_value, max_value, es, fold):
+    memories_prefix = prefixes[0]
+    recognition_prefix = prefixes[1]
+    weights_prefix = prefixes[2]
+
+    memories_features = []
+    memories_recognition = []
+    memories_weights = []
+    for fs in features:
+        memory, recognized, weight = eam.recall(fs)
+        memories_features.append(memory)
+        memories_recognition.append(recognized)
+        memories_weights.append(weight)
+    memories_features = np.array(memories_features, dtype = float)
+    memories_features = rsize_recall(memories_features, msize, min_value, max_value)
+    memories_recognition = np.array(memories_recognition, dtype=int)
+    memories_weights = np.array(memories_weights, dtype=float)
+
+    features_filename = constants.data_filename(memories_prefix, es, fold)
+    recognition_filename = constants.data_filename(recognition_prefix, es, fold)
+    weights_filename = constants.data_filename(weights_prefix, es, fold)
+    np.save(features_filename, memories_features)
+    np.save(recognition_filename, memories_recognition)
+    np.save(weights_filename, memories_weights)
+
 
 def decode_test_features(es):
     """ Creates images directly from test features, completing an autoencoder.
@@ -751,6 +774,12 @@ def decode_test_features(es):
     testing_labels_prefix = constants.labels_prefix + suffix
     testing_data_prefix = constants.data_prefix + suffix
 
+    suffix = constants.noised_suffix
+    noised_features_prefix = constants.features_prefix + suffix
+    noised_labels_prefix = constants.labels_prefix + suffix
+    noised_data_prefix = constants.data_prefix + suffix
+
+
     for fold in range(constants.n_folds):
         # Load test features and labels
         testing_features_filename = constants.data_filename(testing_features_prefix, es, fold)
@@ -759,56 +788,76 @@ def decode_test_features(es):
         testing_features = np.load(testing_features_filename)
         testing_data = np.load(testing_data_filename)
         testing_labels = np.load(testing_labels_filename)
+
+        noised_features_filename = constants.data_filename(noised_features_prefix, es, fold)
+        noised_data_filename = constants.data_filename(noised_data_prefix, es, fold)
+        noised_labels_filename = constants.data_filename(noised_labels_prefix, es, fold)
+        noised_features = np.load(noised_features_filename)
+        noised_data = np.load(noised_data_filename)
+        noised_labels = np.load(noised_labels_filename)
+
         # Loads the decoder.
         model_filename = constants.decoder_filename(model_prefix, es, fold)
         model = tf.keras.models.load_model(model_filename)
         model.summary()
     
-        produced_images = model.predict(testing_features)
+        prod_test_images = model.predict(testing_features)
+        prod_nsed_images = model.predict(noised_features)
         n = len(testing_labels)
 
-        for (i, original, produced, label) in \
-                zip(range(n), testing_data, produced_images, testing_labels):
+        for (i, original, testing, noised, label) in \
+                zip(range(n), testing_data, prod_test_images,
+                    prod_nsed_images, testing_labels):
             store_original_and_test(
-                original, produced, constants.testing_path, i, label, es, fold)
+                original, testing, noised, constants.testing_path, i, label, es, fold)
 
 def decode_memories(msize, es):
     msize_suffix = constants.msize_suffix(msize)
     model_prefix = constants.model_name(es)
-    suffix = constants.testing_suffix
-    testing_labels_prefix = constants.labels_prefix + suffix
+    testing_labels_prefix = constants.labels_prefix + constants.testing_suffix
 
     for sigma in constants.sigma_values:
         print(f'Running remembering for sigma = {sigma:.2f}')
         sigma_suffix = constants.sigma_suffix(sigma)
         suffix = msize_suffix + sigma_suffix
         memories_prefix = constants.memories_name(es) + suffix
+        noised_prefix = constants.noised_memories_name(es) + suffix
         for fold in range(constants.n_folds):
             # Load test features and labels
             memories_features_filename = constants.data_filename(memories_prefix, es, fold)
+            noised_features_filename = constants.data_filename(noised_prefix, es, fold)
             testing_labels_filename = constants.data_filename(testing_labels_prefix, es, fold)
             memories_features = np.load(memories_features_filename)
+            noised_features = np.load(noised_features_filename)
             testing_labels = np.load(testing_labels_filename)
             # Loads the decoder.
             model_filename = constants.decoder_filename(model_prefix, es, fold)
             model = tf.keras.models.load_model(model_filename)
             model.summary()
 
-            produced_images = model.predict(memories_features)
+            memories_images = model.predict(memories_features)
+            noised_images = model.predict(noised_features)
             n = len(testing_labels)
             memories_path = constants.memories_path + suffix
-            for (i, produced, label) in \
-                    zip(range(n), produced_images, testing_labels):
-                store_memory(produced, memories_path, i, label, es, fold)
+            for (i, memory, noised, label) in \
+                    zip(range(n), memories_images, noised_images, testing_labels):
+                store_memory(memory, memories_path, i, label, es, fold)
+                store_noised_memory(noised, memories_path, i, label, es, fold)
 
-def store_original_and_test(original, produced, directory, idx, label, es, fold):
+def store_original_and_test(original, testing, noised, directory, idx, label, es, fold):
     original_filename = constants.original_image_filename(directory, idx, label, es, fold)
-    produced_filename = constants.produced_image_filename(directory, idx, label, es, fold)
+    testing_filename = constants.testing_image_filename(directory, idx, label, es, fold)
+    noised_filename = constants.noised_image_filename(directory, idx, label, es, fold)
     store_image(original_filename, original)
-    store_image(produced_filename, produced)
+    store_image(testing_filename, testing)
+    store_image(noised_filename, noised)
 
 def store_memory(memory, directory, idx, label, es, fold):
     memory_filename = constants.memory_image_filename(directory, idx, label, es, fold)
+    store_image(memory_filename, memory)
+
+def store_noised_memory(memory, directory, idx, label, es, fold):
+    memory_filename = constants.noised_image_filename(directory, idx, label, es, fold)
     store_image(memory_filename, memory)
 
 def store_image(filename, array):

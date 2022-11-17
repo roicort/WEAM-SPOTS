@@ -32,10 +32,13 @@ data_prefix = 'data'
 labels_prefix = 'labels'
 features_prefix = 'features'
 memories_prefix = 'memories'
+noised_prefix = 'mem_noised'
 mem_conf_prefix = 'mem_confrix'
 model_prefix = 'model'
 recognition_prefix = 'recognition'
+recog_noised_prefix = 'recog_noised'
 weights_prefix = 'weights'
+weights_noised_prefix = 'weights-noised'
 stats_prefix = 'model_stats'
 learn_params_prefix ='learn_params'
 memory_parameters_prefix='mem_params'
@@ -46,6 +49,7 @@ learning_data_seed = 'seed_balanced'
 learning_data_learned = 'learned'
 
 # Categories suffixes.
+original_suffix = '-original'
 training_suffix = '-training'
 filling_suffix = '-filling'
 testing_suffix = '-testing'
@@ -57,10 +61,6 @@ encoder_suffix = '-encoder'
 classifier_suffix = '-classifier'
 decoder_suffix = '-decoder'
 memory_suffix = '-memory'
-
-# Other suffixes.
-original_suffix = '-original'
-produced_suffix = '-produced'
 
 data_suffix = '_X'
 labels_suffix = '_Y'
@@ -219,11 +219,20 @@ def labels_name(es):
 def memories_name(es):
     return memories_prefix
 
+def noised_memories_name(es):
+    return noised_prefix
+
 def recognition_name(es):
     return recognition_prefix
 
+def noised_recog_name(es):
+    return recog_noised_prefix
+
 def weights_name(es):
     return weights_prefix
+
+def noised_weights_name(es):
+    return weights_noised_prefix
 
 def learn_params_name(es):
     return learn_params_prefix
@@ -299,14 +308,14 @@ def recog_filename(name_prefix, es, fold):
 def original_image_filename(path, idx, label, es, fold):
     return image_filename(path, idx, label, original_suffix, es, fold)
 
-def produced_image_filename(dir, idx, label, es, fold):
-    return image_filename(dir, idx, label, produced_suffix, es, fold)
+def testing_image_filename(dir, idx, label, es, fold):
+    return image_filename(dir, idx, label, testing_suffix, es, fold)
+
+def noised_image_filename(dir, idx, label, es, fold):
+    return image_filename(dir, idx, label, noised_suffix, es, fold)
 
 def memory_image_filename(dir, idx, label, es, fold):
     return image_filename(dir, idx, label, memory_suffix, es, fold)
-
-
-
 
 def mean_idx(m):
     return m
