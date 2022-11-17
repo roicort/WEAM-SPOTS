@@ -288,7 +288,14 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
         testing_data_filename = constants.data_filename(testing_data_prefix, es, fold)
         testing_data = np.load(testing_data_filename)
 
-        # Recreate the exact same model, including its weights and the optimizer
+        suffix = constants.noised_suffix
+        noised_features_prefix = features_prefix + suffix        
+        noised_features_filename = constants.data_filename(noised_features_prefix, es, fold)
+        noised_data_prefix = data_prefix + suffix
+        noised_data_filename = constants.data_filename(noised_data_prefix, es, fold)
+        noised_data = np.load(noised_data_filename)
+
+        # Load de encoder
         filename = constants.encoder_filename(model_prefix, es, fold)
         model = tf.keras.models.load_model(filename)
         model.summary()
@@ -296,7 +303,9 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
         training_features = model.predict(training_data)
         filling_features = model.predict(filling_data)
         testing_features = model.predict(testing_data)
+        noised_features = model.predict(noised_data)
 
         np.save(training_features_filename, training_features)
         np.save(filling_features_filename, filling_features)
         np.save(testing_features_filename, testing_features)
+        np.save(noised_features_filename, noised_features)
