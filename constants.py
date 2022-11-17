@@ -49,6 +49,7 @@ learning_data_learned = 'learned'
 training_suffix = '-training'
 filling_suffix = '-filling'
 testing_suffix = '-testing'
+noised_suffix = '-noised'
 memories_suffix = '-memories'
 
 # Model suffixes.
@@ -72,10 +73,6 @@ nnetwork_suffix = '-rnn'
 learning_suffixes = [[original_suffix], [agreed_suffix], [amsystem_suffix],
     [nnetwork_suffix], [original_suffix, amsystem_suffix]]
 
-# Size of images in rows and columns.
-n_rows = 28
-n_columns = 28
-
 # Number of columns in memory
 domain = 256
 n_folds = 1
@@ -95,6 +92,7 @@ sigma_idx = 3
 nn_training_percent = 0.70
 am_filling_percent = 0.20
 am_testing_percent = 0.10
+noise_percent = 30
 
 n_labels = 10
 labels_per_memory = 1

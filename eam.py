@@ -812,7 +812,7 @@ def store_memory(memory, directory, idx, label, es, fold):
     store_image(memory_filename, memory)
 
 def store_image(filename, array):
-    pixels = array.reshape(constants.n_columns, constants.n_rows)
+    pixels = array.reshape(dataset.columns, dataset.rows)
     pixels = pixels.round().astype(np.uint8)
     png.from_array(pixels, 'L;8').save(filename)
 

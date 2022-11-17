@@ -179,11 +179,14 @@ def train_network(prefix, es):
         training_data, training_labels = dataset.get_training_data()
         filling_data, filling_labels = dataset.get_filling_data()
         testing_data, testing_labels = dataset.get_testing_data()
+        noised_data, _ = dataset.noised(
+            testing_data, testing_labels, constants.noise_percent)
 
         suffixes = {
             constants.training_suffix: (training_data, training_labels),
             constants.filling_suffix : (filling_data, filling_labels),
-            constants.testing_suffix : (testing_data, testing_labels)
+            constants.testing_suffix : (testing_data, testing_labels),
+            constants.noised_suffix  : (noised_data, testing_labels)
         }
             
         for suffix in suffixes:

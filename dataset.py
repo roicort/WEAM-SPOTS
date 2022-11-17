@@ -37,7 +37,7 @@ class DataSet:
     def load_dataset(self, path):
         data_train, labels_train = self.load_mnist(path, kind='train')
         data_test, labels_test = self.load_mnist(path, kind='t10k')
-        data = np.concatenate((data_train, data_test), axis=0, dtype=float)
+        data = np.concatenate((data_train, data_test), axis=0).astype(dtype=float)
         labels = np.concatenate((labels_train, labels_test), axis=0)
         pairs = self.shuffle(data, labels)
         return self._data_per_label(pairs)
@@ -75,8 +75,9 @@ class DataSet:
     def get_filling_data(self):
         return self.get_segment(self._FILLING_SEGMENT, self.fold)
 
-    def get_testing_data(self):
-        return self.get_segment(self._TESTING_SEGMENT, self.fold)
+    def get_testing_data(self, noise = 0):
+        data = self.get_segment(self._TESTING_SEGMENT, self.fold)
+        return data if noise == 0 else self.noised(data, noise)
 
     def get_segment(self, segment, fold):
         s = self._get_segments_per_label(segment, fold)
@@ -118,3 +119,24 @@ class DataSet:
         data = np.array([p[0] for p in pairs], dtype=int)
         labels = np.array([p[1] for p in pairs], dtype=int)        
         return data, labels
+
+    def noised(self, data_labels, percent):
+        data = data_labels[0]
+        copy = np.zeros(data.shape, dtype=float)
+        for i in range(len(copy)):
+            copy[i] = self._noised(data[i], percent)
+        return copy, data_labels[1]
+
+    def _noised(self, image, percent):
+        copy = np.array([row[:] for row in image])
+        total = round(columns*rows*percent/100.0)
+        noised = []
+        while len(noised) < total:
+            i = random.randrange(rows)
+            j = random.randrange(columns)
+            if (i, j) in noised:
+                continue
+            value = random.randrange(255)
+            copy[i,j] = value
+            noised.append((i,j))
+        return copy       
