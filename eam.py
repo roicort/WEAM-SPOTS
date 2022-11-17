@@ -732,7 +732,7 @@ def remember(msize, mfill, es):
             print(f'Memory of size {msize} filled with {end} elements for fold {fold}')
 
             for features, prefixes in zip (
-                    [testing_rounded, noised_rounded], prefixes_list)
+                    [testing_rounded, noised_rounded], prefixes_list):
                 save_memories(eam, features, prefixes, msize, min_value, max_value, es, fold)
     print('Remembering done!')
 
@@ -805,11 +805,12 @@ def decode_test_features(es):
         prod_nsed_images = model.predict(noised_features)
         n = len(testing_labels)
 
-        for (i, original, testing, noised, label) in \
-                zip(range(n), testing_data, prod_test_images,
+        for (i, testing, prod_test, noised, prod_noise, label) in \
+                zip(range(n), testing_data, prod_test_images, noised_data,
                     prod_nsed_images, testing_labels):
             store_original_and_test(
-                original, testing, noised, constants.testing_path, i, label, es, fold)
+                testing, prod_test, noised, prod_noise,
+                        constants.testing_path, i, label, es, fold)
 
 def decode_memories(msize, es):
     msize_suffix = constants.msize_suffix(msize)
@@ -844,13 +845,16 @@ def decode_memories(msize, es):
                 store_memory(memory, memories_path, i, label, es, fold)
                 store_noised_memory(noised, memories_path, i, label, es, fold)
 
-def store_original_and_test(original, testing, noised, directory, idx, label, es, fold):
-    original_filename = constants.original_image_filename(directory, idx, label, es, fold)
+def store_original_and_test(testing, prod_test, noised, prod_noise,
+    directory, idx, label, es, fold):
     testing_filename = constants.testing_image_filename(directory, idx, label, es, fold)
+    prod_test_filename = constants.prod_testing_image_filename(directory, idx, label, es, fold)
     noised_filename = constants.noised_image_filename(directory, idx, label, es, fold)
-    store_image(original_filename, original)
+    prod_noise_filename = constants.prod_noised_image_filename(directory, idx, label, es, fold)
     store_image(testing_filename, testing)
+    store_image(prod_test_filename, prod_test)
     store_image(noised_filename, noised)
+    store_image(prod_noise_filename, prod_noise)
 
 def store_memory(memory, directory, idx, label, es, fold):
     memory_filename = constants.memory_image_filename(directory, idx, label, es, fold)

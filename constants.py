@@ -54,6 +54,7 @@ training_suffix = '-training'
 filling_suffix = '-filling'
 testing_suffix = '-testing'
 noised_suffix = '-noised'
+prod_noised_suffix = 'prod_noised'
 memories_suffix = '-memories'
 
 # Model suffixes.
@@ -305,14 +306,17 @@ def memory_confrix_filename(fill, es, fold):
 def recog_filename(name_prefix, es, fold):
     return csv_filename(name_prefix, es, fold)
 
-def original_image_filename(path, idx, label, es, fold):
+def testing_image_filename(path, idx, label, es, fold):
     return image_filename(path, idx, label, original_suffix, es, fold)
 
-def testing_image_filename(dir, idx, label, es, fold):
+def prod_testing_image_filename(dir, idx, label, es, fold):
     return image_filename(dir, idx, label, testing_suffix, es, fold)
 
 def noised_image_filename(dir, idx, label, es, fold):
     return image_filename(dir, idx, label, noised_suffix, es, fold)
+
+def prod_noised_image_filename(dir, idx, label, es, fold):
+    return image_filename(dir, idx, label, prod_noised_suffix, es, fold)
 
 def memory_image_filename(dir, idx, label, es, fold):
     return image_filename(dir, idx, label, memory_suffix, es, fold)
