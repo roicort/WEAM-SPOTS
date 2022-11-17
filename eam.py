@@ -325,30 +325,15 @@ def split_every(n, iterable):
         yield piece
         piece = list(islice(i, n))
 
-<<<<<<< HEAD
-def optimum_memory_sizes(precisions, recalls):
-=======
-
-def _get_f1(t):
-  return t[0]
-
 def optimum_indexes(precisions, recalls):
->>>>>>> 14932696518c99a17a562c71f859548005123f9c
     f1s = []
     i = 0
     for p, r in zip(precisions, recalls):
         f1 = 0 if (r+p) == 0 else 2*(r*p)/(r+p)
         f1s.append((f1, i))
         i += 1
-<<<<<<< HEAD
-    f1s.sort(reverse = True, key = lambda t : t[0])
-    return [constants.memory_sizes[t[1]]
-        for t in f1s[:constants.n_best_memory_sizes]]
-
-=======
-    f1s.sort(reverse = True, key = _get_f1)
+    f1s.sort(reverse = True, key = lambda tuple : tuple[0])
     return [t[1] for t in f1s[:constants.n_best_memory_sizes]]
->>>>>>> 14932696518c99a17a562c71f859548005123f9c
 
 def get_ams_results(
         midx, msize, domain, trf, tef, trl, tel, classifier, es, fold):
@@ -542,25 +527,12 @@ def test_filling_per_fold(mem_size, domain, es, fold):
     testing_features = np.load(testing_features_filename)
     testing_labels = np.load(testing_labels_filename)
 
-<<<<<<< HEAD
     max_value = maximum((filling_features, testing_features))
     min_value = minimum((filling_features, testing_features))
     filling_features = msize_features(
         filling_features, mem_size, min_value, max_value)
     testing_features = msize_features(
         testing_features, mem_size, min_value, max_value)
-=======
-    filling_min = filling_features.min()
-    testing_min = testing_features.min()
-    filling_max = filling_features.max()
-    testing_max = testing_features.max()
-    minimum = filling_min if filling_min < testing_min else testing_min
-    maximum = filling_max if filling_max > testing_max else testing_max
-    filling_rounded = msize_features(
-        filling_features, mem_size, minimum, maximum)
-    testing_rounded = msize_features(
-        testing_features, mem_size, minimum, maximum)
->>>>>>> 14932696518c99a17a562c71f859548005123f9c
 
     total = len(filling_labels)
     percents = np.array(constants.memory_fills)
@@ -572,19 +544,12 @@ def test_filling_per_fold(mem_size, domain, es, fold):
 
     start = 0
     for percent, end in zip(percents, steps):
-        features = filling_rounded[start:end]
+        features = filling_features[start:end]
         print(f'Filling from {start} to {end}.')
         behaviour, entropy = \
-<<<<<<< HEAD
-            tes_filling_percent(ams, mem_size, domain,
-                min_value, max_value, features, labels,
-                testing_features, testing_labels, es, fold, percent, classifier)
-=======
-            test_filling_percent(
-                eam, mem_size, minimum, maximum, features,
-                testing_rounded, testing_labels, percent, classifier)
->>>>>>> 14932696518c99a17a562c71f859548005123f9c
-
+            test_filling_percent(eam, mem_size,
+                min_value, max_value, filling_features, 
+                testing_features, testing_labels, percent, classifier)
         # A list of tuples (position, label, features)
         # fold_recalls += recalls
         # An array with average entropy per step.
