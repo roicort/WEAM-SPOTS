@@ -17,7 +17,7 @@
 
 Usage:
   eam -h | --help
-  eam (-n | -f | -c | -e <experiment> | -o) [--runpath=<runpath>] [ -l (en | es) ]
+  eam (-n | -f | -c | -e <experiment> | -r | -o) [--runpath=<runpath>] [ -l (en | es) ]
 
 Options:
   -h        Show this screen.
@@ -25,7 +25,8 @@ Options:
   -f        Generates Features for all data using the encoder.
   -c        Generates graphs Characterizing classes of features (by label).
   -e        Run the experiment (options 1 or 2).
-  -o        Generate images from testing data and memories.
+  -r        Generate images from testing data and memories of them.
+  -o        Generate images from occluded testing data and memories of them.
   --runpath=<runpath>           Sets the path to the directory where everything will be saved [default: runs]
   -l        Chooses Language for graphs.
 
@@ -43,11 +44,9 @@ import numpy as np
 import tensorflow as tf
 from itertools import islice
 import gettext
-if typing.TYPE_CHECKING:
-    def _(message):
-        pass
 import gc
 from docopt import docopt
+import png
 import sys
 sys.setrecursionlimit(10000)
 
@@ -55,6 +54,12 @@ import neural_net
 import dataset
 import constants
 from associative import AssociativeMemory, AssociativeMemorySystem
+
+# A trick to avoid getting a lot of errors at edition time because of
+# undefined '_' gettext function.
+if typing.TYPE_CHECKING:
+    def _(message):
+        pass
 
 # Translation
 gettext.install('eam', localedir=None, codeset=None, names=None)
@@ -247,27 +252,21 @@ def plot_memories(ams, es, fold):
         prefix = f'memory-{label}-state'
         plot_memory(ams[label], prefix, es, fold)
 
+def maximum(arrays):
+    max = float('-inf')
+    for a in arrays:
+        local_max = np.max(a)
+        if local_max > max:
+            max = local_max
+    return max
 
-def get_label(memories, weights=None, entropies=None):
-    if len(memories) == 1:
-        return memories[0]
-    random.shuffle(memories)
-    if (entropies is None) or (weights is None):
-        return memories[0]
-    else:
-        i = memories[0]
-        entropy = entropies[i]
-        weight = weights[i]
-        penalty = entropy/weight if weight > 0 else float('inf')
-        for j in memories[1:]:
-            entropy = entropies[j]
-            weight = weights[j]
-            new_penalty = entropy/weight if weight > 0 else float('inf')
-            if new_penalty < penalty:
-                i = j
-                penalty = new_penalty
-        return i
-
+def minimum(arrays):
+    min = float('-inf')
+    for a in arrays:
+        local_min = np.min(a)
+        if local_min < min:
+            min = local_min
+    return min
 
 def msize_features(features, msize, min_value, max_value):
     return np.round((msize-1)*(features-min_value) / (max_value-min_value)).astype(int)
@@ -278,66 +277,6 @@ def rsize_recall(recall, msize, min_value, max_value):
     else:
         return (max_value - min_value)* recall.astype(dtype=float) \
             /(msize - 1.0) + min_value
-
-
-TP = (0, 0)
-FP = (0, 1)
-FN = (1, 0)
-TN = (1, 1)
-
-
-def conf_sum(cms, t):
-    return np.sum([cms[i][t] for i in range(len(cms))])
-
-
-def memories_precision(cms):
-    total = conf_sum(cms, TP) + conf_sum(cms, FN)
-    if total == 0:
-        return 0.0
-    precision = 0.0
-    for m in range(len(cms)):
-        denominator = (cms[m][TP] + cms[m][FP])
-        if denominator == 0:
-            m_precision = 1.0
-        else:
-            m_precision = cms[m][TP] / denominator
-        weight = (cms[m][TP] + cms[m][FN]) / total
-        precision += weight*m_precision
-    return precision
-
-
-def memories_recall(cms):
-    total = conf_sum(cms, TP) + conf_sum(cms, FN)
-    if total == 0:
-        return 0.0
-    recall = 0.0
-    for m in range(len(cms)):
-        m_recall = cms[m][TP] / (cms[m][TP] + cms[m][FN])
-        weight = (cms[m][TP] + cms[m][FN]) / total
-        recall += weight*m_recall
-    return recall
-
-
-def memories_accuracy(cms):
-    total = conf_sum(cms, TP) + conf_sum(cms, FN)
-    if total == 0:
-        return 0.0
-    accuracy = 0.0
-    for m in range(len(cms)):
-        m_accuracy = (cms[m][TP] + cms[m][TN]) / total
-        weight = (cms[m][TP] + cms[m][FN]) / total
-        accuracy += weight*m_accuracy
-    return accuracy
-
-
-def register_in_memory(memory, features_iterator):
-    for features in features_iterator:
-        memory.register(features)
-
-
-def memory_entropy(m, memory: AssociativeMemory):
-    return m, memory.entropy
-
 
 def recognize_by_memory(eam, tef_rounded, tel, msize, minimum, maximum, classifier):
     data = []
@@ -386,18 +325,14 @@ def split_every(n, iterable):
         yield piece
         piece = list(islice(i, n))
 
-
-def _get_f1(t):
-  return t[0]
-
 def optimum_memory_sizes(precisions, recalls):
     f1s = []
     i = 0
     for p, r in zip(precisions, recalls):
         f1 = 0 if (r+p) == 0 else 2*(r*p)/(r+p)
-        f1s.append(tuple(f1, i))
+        f1s.append((f1, i))
         i += 1
-    f1s.sort(reverse = True, key = _get_f1)
+    f1s.sort(reverse = True, key = lambda t : t[0])
     return [constants.memory_sizes[t[1]]
         for t in f1s[:constants.n_best_memory_sizes]]
 
@@ -405,12 +340,8 @@ def optimum_memory_sizes(precisions, recalls):
 def get_ams_results(
         midx, msize, domain, trf, tef, trl, tel, classifier, es, fold):
     # Round the values
-    max_value = trf.max()
-    other_value = tef.max()
-    max_value = max_value if max_value > other_value else other_value
-    min_value = trf.min()
-    other_value = tef.min()
-    min_value = min_value if min_value < other_value else other_value
+    max_value = maximum((trf, tef))
+    min_value = minimum((trf, tef))
 
     trf_rounded = msize_features(trf, msize, min_value, max_value)
     tef_rounded = msize_features(tef, msize, min_value, max_value)
@@ -597,16 +528,12 @@ def test_filling_per_fold(mem_size, domain, es, fold):
     testing_features = np.load(testing_features_filename)
     testing_labels = np.load(testing_labels_filename)
 
-    filling_max = filling_features.max()
-    testing_max = testing_features.max()
-    fillin_min = filling_features.min()
-    testing_min = testing_features.min()
-    maximum = filling_max if filling_max > testing_max else testing_max
-    minimum = fillin_min if fillin_min < testing_min else testing_min
+    max_value = maximum((filling_features, testing_features))
+    min_value = minimum((filling_features, testing_features))
     filling_features = msize_features(
-        filling_features, mem_size, minimum, maximum)
+        filling_features, mem_size, min_value, max_value)
     testing_features = msize_features(
-        testing_features, mem_size, minimum, maximum)
+        testing_features, mem_size, min_value, max_value)
 
     total = len(filling_labels)
     percents = np.array(constants.memory_fills)
@@ -623,7 +550,7 @@ def test_filling_per_fold(mem_size, domain, es, fold):
 
         behaviour, entropy = \
             tes_filling_percent(ams, mem_size, domain,
-                minimum, maximum, features, labels,
+                min_value, max_value, features, labels,
                 testing_features, testing_labels, es, fold, percent, classifier)
 
         # A list of tuples (position, label, features)
@@ -758,6 +685,130 @@ def save_learned_params(mem_sizes, fill_percents, es):
     filename = constants.data_filename(name, es)
     np.save(filename, np.array([mem_sizes, fill_percents], dtype=int))
 
+def load_learned_params(es):
+    name = constants.learn_params_name(es)
+    filename = constants.data_filename(name, es)
+    params = np.load(filename)
+    size_fill = [(params[0,j], params[1,j]) for j in range(params.shape[1])]
+    return size_fill
+
+def remember(msize, mfill, es):
+    msize_suffix = constants.msize_suffix(msize)
+    for sigma in constants.sigma_values:
+        print(f'Running remembering for sigma = {sigma:.2f}')
+        sigma_suffix = constants.sigma_suffix(sigma)
+        suffix = msize_suffix + sigma_suffix
+        memories_prefix = constants.memories_name(es) + suffix
+        recognition_prefix = constants.recognition_name(es) + suffix
+        weights_prefix = constants.weights_name(es) + suffix
+
+        for fold in range(constants.n_folds):
+            print(f'Running remembering for fold: {fold}')
+            suffix = constants.filling_suffix
+            filling_features_filename = constants.features_name(es) + suffix
+            filling_features_filename = constants.data_filename(
+                filling_features_filename, es, fold)
+            filling_labels_filename = constants.labels_name(es) + suffix
+            filling_labels_filename = constants.data_filename(
+                filling_labels_filename, es, fold)
+
+            suffix = constants.testing_suffix
+            testing_features_filename = constants.features_name(es) + suffix
+            testing_features_filename = constants.data_filename(
+                testing_features_filename, es, fold)
+            testing_labels_filename = constants.labels_name(es) + suffix
+            testing_labels_filename = constants.data_filename(
+                testing_labels_filename, es, fold)
+
+            filling_features = np.load(filling_features_filename)
+            filling_labels = np.load(filling_labels_filename)
+            testing_features = np.load(testing_features_filename)
+            testing_labels = np.load(testing_labels_filename)
+            max_value = maximum((filling_features, testing_features))
+            min_value = minimum((filling_features, testing_features))
+            filling_rounded = msize_features(filling_features, msize, min_value, max_value)
+            testing_rounded = msize_features(testing_features, msize, min_value, max_value)
+
+            # Create the memory and fill it
+            p = es.mem_params
+            eam = AssociativeMemory(
+                constants.domain, msize, 
+                p[constants.xi_idx], sigma, p[constants.iota_idx], p[constants.kappa_idx])
+            end = round(len(filling_labels)*mfill/100.0)
+            for features in filling_rounded[:end]:
+                eam.register(features)
+            print(f'Memory of size {msize} filled with {end} elements for fold {fold}')
+
+            memories_features = []
+            memories_recognition = []
+            memories_weights = []
+            for features in testing_rounded:
+                memory, recognized, weight = eam.recall(features)
+                memories_features.append(memory)
+                memories_recognition.append(recognized)
+                memories_weights.append(weight)
+
+            memories_features = np.array(memories_features, dtype = float)
+            memories_features = rsize_recall(memories_features, msize, min_value, max_value)
+            memories_recognition = np.array(memories_recognition, dtype=int)
+            memories_weights = np.array(memories_weights, dtype=float)
+
+            features_filename = constants.data_filename(memories_prefix, es, fold)
+            recognition_filename = constants.data_filename(recognition_prefix, es, fold)
+            weights_filename = constants.data_filename(weights_prefix, es, fold)
+            np.save(features_filename, memories_features)
+            np.save(recognition_filename, memories_recognition)
+            np.save(weights_filename, memories_weights)
+    print('Remembering done!')
+
+def decode_test_features(es):
+    """ Creates images directly from test features, completing an autoencoder.
+    
+    Uses the decoder part of the neural networks to (re)create images from features
+    generated by the encoder.
+    """
+    model_prefix = constants.model_name(es)
+    suffix = constants.testing_suffix
+    testing_features_prefix = constants.features_prefix + suffix
+    testing_labels_prefix = constants.labels_prefix + suffix
+    testing_data_prefix = constants.data_prefix + suffix
+
+    for fold in range(constants.n_folds):
+        # Load test features and labels
+        testing_features_filename = constants.data_filename(testing_features_prefix, es, fold)
+        testing_data_filename = constants.data_filename(testing_data_prefix, es, fold)
+        testing_labels_filename = constants.data_filename(testing_labels_prefix, es, fold)
+        testing_features = np.load(testing_features_filename)
+        testing_data = np.load(testing_data_filename)
+        testing_labels = np.load(testing_labels_filename)
+        # Loads the decoder.
+        model_filename = constants.decoder_filename(model_prefix, es, fold)
+        model = tf.keras.models.load_model(model_filename)
+        model.summary()
+    
+        produced_images = model.predict(testing_features)
+        n = len(testing_labels)
+
+        Parallel(n_jobs=constants.n_jobs, verbose=5)( \
+            delayed(store_images)(original, produced, constants.testing_path, i, label, es, fold) \
+                for (i, original, produced, label) in \
+                    zip(range(n), testing_data, produced_images, testing_labels))
+
+def store_images(original, produced, directory, idx, label, es, fold):
+    original_filename = constants.original_image_filename(directory, idx, label, es, fold)
+    produced_filename = constants.produced_image_filename(directory, idx, label, es, fold)
+    pixels = original.reshape(constants.n_columns, constants.n_rows)
+    pixels = pixels.round().astype(np.uint8)
+    png.from_array(pixels, 'L;8').save(original_filename)
+    pixels = produced.reshape(28,28)
+    pixels = pixels.round().astype(np.uint8)
+    png.from_array(pixels, 'L;8').save(produced_filename)
+
+
+
+def decode_memories(msize, es):
+    pass
+
 
 ##############################################################################
 # Main section
@@ -822,9 +873,12 @@ def run_evaluation(es):
     save_learned_params(best_memory_sizes, best_filling_percents, es)
 
 
-def generate_output(es):
-    neural_net.decode(constants.model_name(es),
-                      constants.data_prefix, constants.labels_prefix, constants.features_prefix, es)
+def generate_memories(es):
+    decode_test_features(es)
+    learned = load_learned_params(es)
+    for msize, mfill in learned:
+        remember(msize, mfill)
+        decode_memories(msize, es)
 
 
 if __name__ == "__main__":
@@ -862,5 +916,5 @@ if __name__ == "__main__":
             run_evaluation(exp_settings)
         else:
             print(f'Experiment number not valid: {experiment}')
-    elif args['-o']:
-        generate_output(exp_settings)
+    elif args['-r']:
+        generate_memories(exp_settings)

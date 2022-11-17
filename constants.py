@@ -35,6 +35,7 @@ memories_prefix = 'memories'
 mem_conf_prefix = 'mem_confrix'
 model_prefix = 'model'
 recognition_prefix = 'recognition'
+weights_prefix = 'weights'
 stats_prefix = 'model_stats'
 learn_params_prefix ='learn_params'
 memory_parameters_prefix='mem_params'
@@ -69,10 +70,15 @@ nnetwork_suffix = '-rnn'
 learning_suffixes = [[original_suffix], [agreed_suffix], [amsystem_suffix],
     [nnetwork_suffix], [original_suffix, amsystem_suffix]]
 
+# Size of images in rows and columns.
+n_rows = 28
+n_columns = 28
 
-n_folds = 1
+# Number of columns in memory
 domain = 256
+n_folds = 1
 n_jobs = 1
+
 
 iota_default = 0.0
 kappa_default = 0.0
@@ -106,6 +112,7 @@ n_behaviours = 7
 
 memory_sizes = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 memory_fills = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 100.0]
+sigma_values = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 n_best_memory_sizes = 3
 n_samples = 10
 learned_data_groups = 6
@@ -148,17 +155,31 @@ def print_counter(n, every, step = 1, symbol = '.', prefix = ''):
         counter =  ' ' + prefix + str(n) + ' '
     print(counter, end = '', flush=True)
 
+def int_suffix(n, prefix=None):
+    prefix = '' if prefix is None else '-' + prefix + '_'
+    return prefix + str(n).zfill(3)
+
+def float_suffix(x, prefix=None):
+    prefix = '' if prefix is None else '-' + prefix + '_'
+    return prefix + f'{x:.2f}'
+
 def extended_suffix(extended):
     return '-ext' if extended else ''
 
 def fold_suffix(fold):
-    return '' if fold is None else '-fld_' + str(fold).zfill(3)
+    return '' if fold is None else int_suffix(fold, 'fld')
 
 def learned_suffix(learned):
-    return '-lrn_' + str(learned).zfill(3)
+    return int_suffix(learned, 'lrn')
 
 def stage_suffix(stage):
-    return '-stg_' + str(stage).zfill(3)
+    return int_suffix(stage, 'stg')
+
+def msize_suffix(msize):
+    return int_suffix(msize, 'msz')
+
+def sigma_suffix(sigma):
+    return float_suffix(sigma, 'sgm')
 
 def get_name_w_suffix(prefix):
     suffix = ''
@@ -188,6 +209,12 @@ def labels_name(es):
 
 def memories_name(es):
     return memories_prefix
+
+def recognition_name(es):
+    return recognition_prefix
+
+def weights_name(es):
+    return weights_prefix
 
 def learn_params_name(es):
     return learn_params_prefix
@@ -254,7 +281,7 @@ def decoder_filename(name_prefix, es, fold):
     return filename(name_prefix + decoder_suffix, es, fold)
 
 def memory_confrix_filename(fill, es, fold):
-    prefix = mem_conf_prefix + '-fll_' + str(fill).zfill(3)
+    prefix = mem_conf_prefix + int_suffix(fill, 'fll')
     return data_filename(prefix, es, fold)
 
 def recog_filename(name_prefix, es, fold):
