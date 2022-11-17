@@ -776,19 +776,57 @@ def decode_test_features(es):
         n = len(testing_labels)
 
         Parallel(n_jobs=constants.n_jobs, verbose=5)( \
-            delayed(store_images)(original, produced, constants.testing_path, i, label, es, fold) \
+            delayed(store_original_and_test)(
+                original, produced, constants.testing_path, i, label, es, fold) \
                 for (i, original, produced, label) in \
                     zip(range(n), testing_data, produced_images, testing_labels))
 
-def store_images(original, produced, directory, idx, label, es, fold):
+def decode_memories(msize, es):
+    msize_suffix = constants.msize_suffix(msize)
+    model_prefix = constants.model_name(es)
+    suffix = constants.testing_suffix
+    testing_labels_prefix = constants.labels_prefix + suffix
+
+    for sigma in constants.sigma_values:
+        print(f'Running remembering for sigma = {sigma:.2f}')
+        sigma_suffix = constants.sigma_suffix(sigma)
+        suffix = msize_suffix + sigma_suffix
+        memories_prefix = constants.memories_name(es) + suffix
+        for fold in range(constants.n_folds):
+            # Load test features and labels
+            memories_features_filename = constants.data_filename(memories_prefix, es, fold)
+            testing_labels_filename = constants.data_filename(testing_labels_prefix, es, fold)
+            memories_features = np.load(memories_features_filename)
+            testing_labels = np.load(testing_labels_filename)
+            # Loads the decoder.
+            model_filename = constants.decoder_filename(model_prefix, es, fold)
+            model = tf.keras.models.load_model(model_filename)
+            model.summary()
+
+            produced_images = model.predict(memories_features)
+            n = len(testing_labels)
+            memories_path = constants.memories_path + suffix
+            Parallel(n_jobs=constants.n_jobs, verbose=5)( \
+                delayed(store_memory)(produced, memories_path, i, label, es, fold) \
+                    for (i, produced, label) in \
+                        zip(range(n), produced_images, testing_labels))
+
+def store_original_and_test(original, produced, directory, idx, label, es, fold):
     original_filename = constants.original_image_filename(directory, idx, label, es, fold)
     produced_filename = constants.produced_image_filename(directory, idx, label, es, fold)
-    pixels = original.reshape(constants.n_columns, constants.n_rows)
+    store_image(original_filename, original)
+    store_image(produced_filename, produced)
+
+def store_memory(memory, directory, idx, label, es, fold):
+    memory_filename = constants.memory_image_filename(directory, idx, label, es, fold)
+    store_image(memory_filename, memory)
+
+def store_image(filename, array):
+    pixels = array.reshape(constants.n_columns, constants.n_rows)
     pixels = pixels.round().astype(np.uint8)
-    png.from_array(pixels, 'L;8').save(original_filename)
-    pixels = produced.reshape(28,28)
-    pixels = pixels.round().astype(np.uint8)
-    png.from_array(pixels, 'L;8').save(produced_filename)
+    png.from_array(pixels, 'L;8').save(filename)
+
+
 
 
 

@@ -49,16 +49,18 @@ learning_data_learned = 'learned'
 training_suffix = '-training'
 filling_suffix = '-filling'
 testing_suffix = '-testing'
-memory_suffix = '-memories'
+memories_suffix = '-memories'
 
 # Model suffixes.
 encoder_suffix = '-encoder'
 classifier_suffix = '-classifier'
 decoder_suffix = '-decoder'
+memory_suffix = '-memory'
 
 # Other suffixes.
 original_suffix = '-original'
 produced_suffix = '-produced'
+
 data_suffix = '_X'
 labels_suffix = '_Y'
 matrix_suffix = '-confrix'
@@ -302,6 +304,8 @@ def original_image_filename(path, idx, label, es, fold):
 def produced_image_filename(dir, idx, label, es, fold):
     return image_filename(dir, idx, label, produced_suffix, es, fold)
 
+def memory_image_filename(dir, idx, label, es, fold):
+    return image_filename(dir, idx, label, memory_suffix, es, fold)
 
 
 
