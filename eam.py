@@ -694,22 +694,14 @@ def remember(msize, mfill, es):
             filling_features_filename = constants.features_name(es) + suffix
             filling_features_filename = constants.data_filename(
                 filling_features_filename, es, fold)
-            filling_labels_filename = constants.labels_name(es) + suffix
-            filling_labels_filename = constants.data_filename(
-                filling_labels_filename, es, fold)
 
             suffix = constants.testing_suffix
             testing_features_filename = constants.features_name(es) + suffix
             testing_features_filename = constants.data_filename(
                 testing_features_filename, es, fold)
-            testing_labels_filename = constants.labels_name(es) + suffix
-            testing_labels_filename = constants.data_filename(
-                testing_labels_filename, es, fold)
 
             filling_features = np.load(filling_features_filename)
-            filling_labels = np.load(filling_labels_filename)
             testing_features = np.load(testing_features_filename)
-            testing_labels = np.load(testing_labels_filename)
             max_value = maximum((filling_features, testing_features))
             min_value = minimum((filling_features, testing_features))
             filling_rounded = msize_features(filling_features, msize, min_value, max_value)
@@ -720,7 +712,7 @@ def remember(msize, mfill, es):
             eam = AssociativeMemory(
                 constants.domain, msize, 
                 p[constants.xi_idx], sigma, p[constants.iota_idx], p[constants.kappa_idx])
-            end = round(len(filling_labels)*mfill/100.0)
+            end = round(len(filling_features)*mfill/100.0)
             for features in filling_rounded[:end]:
                 eam.register(features)
             print(f'Memory of size {msize} filled with {end} elements for fold {fold}')
@@ -775,11 +767,10 @@ def decode_test_features(es):
         produced_images = model.predict(testing_features)
         n = len(testing_labels)
 
-        Parallel(n_jobs=constants.n_jobs, verbose=5)( \
-            delayed(store_original_and_test)(
-                original, produced, constants.testing_path, i, label, es, fold) \
-                for (i, original, produced, label) in \
-                    zip(range(n), testing_data, produced_images, testing_labels))
+        for (i, original, produced, label) in \
+                zip(range(n), testing_data, produced_images, testing_labels):
+            store_original_and_test(
+                original, produced, constants.testing_path, i, label, es, fold)
 
 def decode_memories(msize, es):
     msize_suffix = constants.msize_suffix(msize)
@@ -806,10 +797,9 @@ def decode_memories(msize, es):
             produced_images = model.predict(memories_features)
             n = len(testing_labels)
             memories_path = constants.memories_path + suffix
-            Parallel(n_jobs=constants.n_jobs, verbose=5)( \
-                delayed(store_memory)(produced, memories_path, i, label, es, fold) \
-                    for (i, produced, label) in \
-                        zip(range(n), produced_images, testing_labels))
+            for (i, produced, label) in \
+                    zip(range(n), produced_images, testing_labels):
+                store_memory(produced, memories_path, i, label, es, fold)
 
 def store_original_and_test(original, produced, directory, idx, label, es, fold):
     original_filename = constants.original_image_filename(directory, idx, label, es, fold)
@@ -825,13 +815,6 @@ def store_image(filename, array):
     pixels = array.reshape(constants.n_columns, constants.n_rows)
     pixels = pixels.round().astype(np.uint8)
     png.from_array(pixels, 'L;8').save(filename)
-
-
-
-
-
-def decode_memories(msize, es):
-    pass
 
 
 ##############################################################################
