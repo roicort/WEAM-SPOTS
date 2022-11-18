@@ -24,6 +24,26 @@ import constants
 columns = 28
 rows = 28
 
+def noised(data, percent):
+    copy = np.zeros(data.shape, dtype=float)
+    for i in range(len(copy)):
+        copy[i] = _noised(data[i], percent)
+    return copy
+
+def _noised(image, percent):
+    copy = np.array([row[:] for row in image])
+    total = round(columns*rows*percent/100.0)
+    noised = []
+    while len(noised) < total:
+        i = random.randrange(rows)
+        j = random.randrange(columns)
+        if (i, j) in noised:
+            continue
+        value = random.randrange(255)
+        copy[i,j] = value
+        noised.append((i,j))
+    return copy       
+
 class DataSet:
     _TRAINING_SEGMENT = 0
     _FILLING_SEGMENT = 1
@@ -75,9 +95,8 @@ class DataSet:
     def get_filling_data(self):
         return self.get_segment(self._FILLING_SEGMENT, self.fold)
 
-    def get_testing_data(self, noise = 0):
-        data = self.get_segment(self._TESTING_SEGMENT, self.fold)
-        return data if noise == 0 else self.noised(data, noise)
+    def get_testing_data(self):
+        return self.get_segment(self._TESTING_SEGMENT, self.fold)
 
     def get_segment(self, segment, fold):
         s = self._get_segments_per_label(segment, fold)
@@ -120,23 +139,3 @@ class DataSet:
         labels = np.array([p[1] for p in pairs], dtype=int)        
         return data, labels
 
-    def noised(self, data_labels, percent):
-        data = data_labels[0]
-        copy = np.zeros(data.shape, dtype=float)
-        for i in range(len(copy)):
-            copy[i] = self._noised(data[i], percent)
-        return copy, data_labels[1]
-
-    def _noised(self, image, percent):
-        copy = np.array([row[:] for row in image])
-        total = round(columns*rows*percent/100.0)
-        noised = []
-        while len(noised) < total:
-            i = random.randrange(rows)
-            j = random.randrange(columns)
-            if (i, j) in noised:
-                continue
-            value = random.randrange(255)
-            copy[i,j] = value
-            noised.append((i,j))
-        return copy       

@@ -93,7 +93,7 @@ sigma_idx = 3
 nn_training_percent = 0.70
 am_filling_percent = 0.20
 am_testing_percent = 0.10
-noise_percent = 30
+noise_percent = 50
 
 n_labels = 10
 labels_per_memory = 1
