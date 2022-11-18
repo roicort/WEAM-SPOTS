@@ -687,12 +687,15 @@ def remember(msize, mfill, es):
         memories_prefix = constants.memories_name(es) + suffix
         recognition_prefix = constants.recognition_name(es) + suffix
         weights_prefix = constants.weights_name(es) + suffix
+        classif_prefix = constants.classification_name(es) + suffix
         noised_memories_prefix = constants.noised_memories_name(es) + suffix
         noised_recog_prefix = constants.noised_recog_name(es) + suffix
         noised_weights_prefix = constants.noised_weights_name(es) + suffix
+        noised_classif_prefix = constants.noised_classification_name(es) + suffix
         prefixes_list = [
-            [memories_prefix, recognition_prefix, weights_prefix],
-            [noised_memories_prefix, noised_recog_prefix, noised_weights_prefix]
+            [memories_prefix, recognition_prefix, weights_prefix, classif_prefix],
+            [noised_memories_prefix, noised_recog_prefix,
+                noised_weights_prefix, noised_classif_prefix]
         ]
 
         for fold in range(constants.n_folds):
@@ -733,13 +736,14 @@ def remember(msize, mfill, es):
 
             for features, prefixes in zip (
                     [testing_rounded, noised_rounded], prefixes_list):
-                save_memories(eam, features, prefixes, msize, min_value, max_value, es, fold)
+                remember_with_sigma(eam, features, prefixes, msize, min_value, max_value, es, fold)
     print('Remembering done!')
 
-def save_memories(eam, features, prefixes, msize, min_value, max_value, es, fold):
+def remember_with_sigma(eam, features, prefixes, msize, min_value, max_value, es, fold):
     memories_prefix = prefixes[0]
     recognition_prefix = prefixes[1]
     weights_prefix = prefixes[2]
+    classif_prefix = prefixes[3]
 
     memories_features = []
     memories_recognition = []
@@ -754,12 +758,23 @@ def save_memories(eam, features, prefixes, msize, min_value, max_value, es, fold
     memories_recognition = np.array(memories_recognition, dtype=int)
     memories_weights = np.array(memories_weights, dtype=float)
 
+    model_prefix = constants.model_name(es)
+    filename = constants.classifier_filename(model_prefix, es, fold)
+    classifier = tf.keras.models.load_model(filename)
+    classification = np.argmax(classifier.predict(memories_features), axis=1)
+    for i in range(len(classification)):
+        # If the memory does not recognize it, it should not be classified.
+        if not memories_recognition[i]:
+            classification[i] = constants.n_labels
+
     features_filename = constants.data_filename(memories_prefix, es, fold)
     recognition_filename = constants.data_filename(recognition_prefix, es, fold)
     weights_filename = constants.data_filename(weights_prefix, es, fold)
+    classification_filename = constants.data_filename(classif_prefix, es, fold)
     np.save(features_filename, memories_features)
     np.save(recognition_filename, memories_recognition)
     np.save(weights_filename, memories_weights)
+    np.save(classification_filename, classification)
 
 
 def decode_test_features(es):

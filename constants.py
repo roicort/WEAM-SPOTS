@@ -39,6 +39,8 @@ recognition_prefix = 'recognition'
 recog_noised_prefix = 'recog_noised'
 weights_prefix = 'weights'
 weights_noised_prefix = 'weights-noised'
+classification_prefix = 'classification'
+classification_noised_prefix = 'classif-noised'
 stats_prefix = 'model_stats'
 learn_params_prefix ='learn_params'
 memory_parameters_prefix='mem_params'
@@ -234,6 +236,12 @@ def weights_name(es):
 
 def noised_weights_name(es):
     return weights_noised_prefix
+
+def classification_name(es):
+    return classification_prefix
+
+def noised_classification_name(es):
+    return classification_noised_prefix
 
 def learn_params_name(es):
     return learn_params_prefix
