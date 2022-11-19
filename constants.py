@@ -56,7 +56,7 @@ training_suffix = '-training'
 filling_suffix = '-filling'
 testing_suffix = '-testing'
 noised_suffix = '-noised'
-prod_noised_suffix = 'prod_noised'
+prod_noised_suffix = '-prod_noised'
 memories_suffix = '-memories'
 
 # Model suffixes.
