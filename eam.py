@@ -910,6 +910,8 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
     filename = constants.decoder_filename(model_prefix, es, fold)
     decoder = tf.keras.models.load_model(filename)
     for sigma in constants.sigma_values:
+        es.mem_params[constants.sigma_idx] = sigma
+        eam.sigma = sigma
         for i in range(cycles):
             dreams = dreams_by_memory(features, eam, msize, min_value, max_value)
             images = decoder.predict(dreams)
