@@ -894,11 +894,20 @@ def store_image(filename, array):
 
 def dreams_by_memory(features, eam, msize, min_value, max_value):
     dreams = []
+    recognized = []
     for f in features:
-        dream, _, _ = eam.recall(f)
+        dream, recog, _ = eam.recall(f)
         dreams.append(dream)
+        recognized.append(recog)
     dreams = rsize_recall(np.array(dreams, dtype=float),msize, min_value, max_value)
-    return dreams
+    return dreams, recognized
+
+def fix_unrecognized(images, recognized, unknown):
+    fixed = []
+    for image, recog in zip(images, recognized):
+        correct = image if recog else unknown
+        fixed.append(correct)
+    return np.array(fixed, dtype=int)
 
 def dreaming_per_fold(features, chosen, eam, min_value, max_value,
         msize, cycles, es, fold):
@@ -909,13 +918,14 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
     classifier = tf.keras.models.load_model(filename)
     filename = constants.decoder_filename(model_prefix, es, fold)
     decoder = tf.keras.models.load_model(filename)
+    unknown = np.zeros((dataset.rows, dataset.columns), dtype=int)
     for sigma in constants.sigma_values:
         es.mem_params[constants.sigma_idx] = sigma
         eam.sigma = sigma
         for i in range(cycles):
-            dreams = dreams_by_memory(features, eam, msize, min_value, max_value)
-            images = decoder.predict(dreams)
-            classification = classifier.predict(dreams)
+            dreams, recognized = dreams_by_memory(features, eam, msize, min_value, max_value)
+            images = fix_unrecognized(decoder.predict(dreams), recognized, unknown)
+            classification = np.argmax(classifier.predict(dreams), axis=1)
             suffix = constants.msize_suffix(msize)
             suffix += constants.sigma_suffix(sigma)
             suffix += constants.dream_depth_suffix(i)
