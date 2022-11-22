@@ -15,6 +15,7 @@
 
 import csv
 import os
+import re
 from signal import Sigmasks
 import sys
 import numpy as np
@@ -195,9 +196,13 @@ def learned_suffix(learned):
 def stage_suffix(stage):
     return numeric_suffix('stg', stage)
 
+def dream_depth_suffix(cycle):
+    return numeric_suffix('dph', cycle)
+
 def get_name_w_suffix(prefix):
     suffix = ''
     return prefix + suffix
+
 
 def get_full_name(prefix, es):
     if es is None:
@@ -251,6 +256,20 @@ def learn_params_name(es):
 def mem_params_name(es):
     return memory_parameters_prefix
 
+def dirname(path):
+    match = re.search('[^/]*$', path) 
+    if match is None:
+        return path
+    tuple = os.path.splitext(match.group(0))
+    return os.path.dirname(path) if tuple[1] else path
+
+def create_directory(path):
+    try:
+        os.makedirs(path)
+        print(f'Directory {path} created.')
+    except FileExistsError:
+        print(f'Directory {path} already exists.')
+    
 def filename(name_prefix, es = None, fold = None, extension = ''):
     """ Returns a file name in run_path directory with a given extension and an index
     """

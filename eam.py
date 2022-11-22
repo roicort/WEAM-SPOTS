@@ -872,8 +872,10 @@ def store_original_and_test(testing, prod_test, noised, prod_noise,
     store_image(prod_noise_filename, prod_noise)
 
 def store_memory(memory, directory, idx, label, es, fold):
-    memory_filename = constants.memory_image_filename(directory, idx, label, es, fold)
-    store_image(memory_filename, memory)
+    filename = constants.memory_image_filename(directory, idx, label, es, fold)
+    full_directory = constants.dirname(filename)
+    constants.create_directory(full_directory)
+    store_image(filename, memory)
 
 def store_noised_memory(memory, directory, idx, label, es, fold):
     memory_filename = constants.noised_image_filename(directory, idx, label, es, fold)
@@ -923,7 +925,7 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
 def dreaming(msize, mfill, cycles, es):
     filename = constants.csv_filename(constants.chosen_prefix, es)
     chosen = np.genfromtxt(filename, dtype=int, delimiter=',', skip_header=1)
-
+    print(chosen)
     for fold in range(constants.n_folds):
         print(f'Fold: {fold}')
         gc.collect()
@@ -977,7 +979,7 @@ def dreaming(msize, mfill, cycles, es):
 def invalid_choices(chosen, testing_labels):
     invalid = []
     n = len(testing_labels)
-    for i in len(chosen):
+    for i in range(len(chosen)):
         if chosen[i,1] >= n:
             invalid.append((chosen[i,0], chosen[i,1]))
     if invalid:
