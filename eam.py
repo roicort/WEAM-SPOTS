@@ -918,7 +918,7 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
     classifier = tf.keras.models.load_model(filename)
     filename = constants.decoder_filename(model_prefix, es, fold)
     decoder = tf.keras.models.load_model(filename)
-    unknown = np.zeros((dataset.rows, dataset.columns), dtype=int)
+    unknown = np.zeros((dataset.rows, dataset.columns, 1), dtype=int)
     for sigma in constants.sigma_values:
         es.mem_params[constants.sigma_idx] = sigma
         eam.sigma = sigma
