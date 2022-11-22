@@ -941,7 +941,7 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
 
 def dreaming(msize, mfill, cycles, es):
     filename = constants.csv_filename(constants.chosen_prefix, es)
-    chosen = np.genfromtxt(filename, dtype=int, delimiter=',', skip_header=1)
+    chosen = np.genfromtxt(filename, dtype=int, delimiter=',')
     print(chosen)
     for fold in range(constants.n_folds):
         print(f'Fold: {fold}')
