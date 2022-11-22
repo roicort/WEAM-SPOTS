@@ -17,7 +17,7 @@
 
 Usage:
   eam -h | --help
-  eam (-n | -f | -c | -e <experiment> | -r | -o) [--runpath=<runpath>] [ -l (en | es) ]
+  eam (-n | -f | -c | -e <experiment> | -r | -d) [--runpath=<runpath>] [ -l (en | es) ]
 
 Options:
   -h        Show this screen.
@@ -26,7 +26,7 @@ Options:
   -c        Generates graphs Characterizing classes of features (by label).
   -e        Run the experiment (options 1 or 2).
   -r        Generate images from testing data and memories of them.
-  -o        Generate images from occluded testing data and memories of them.
+  -d        Recurrent generation of memories.
   --runpath=<runpath>           Sets the path to the directory where everything will be saved [default: runs]
   -l        Chooses Language for graphs.
 
@@ -879,11 +879,114 @@ def store_noised_memory(memory, directory, idx, label, es, fold):
     memory_filename = constants.noised_image_filename(directory, idx, label, es, fold)
     store_image(memory_filename, memory)
 
+def store_dreams(dreams, chosen, suffix, es, fold):
+    dreams_path = constants.dreams_path + suffix
+    for (dream, label, idx) in \
+            zip(dreams, chosen[:, 0], chosen[:, 1]):
+        store_memory(dream, dreams_path, idx, label, es, fold)
+
 def store_image(filename, array):
     pixels = array.reshape(dataset.columns, dataset.rows)
     pixels = pixels.round().astype(np.uint8)
     png.from_array(pixels, 'L;8').save(filename)
 
+def dreams_by_memory(features, eam, msize, min_value, max_value):
+    dreams = []
+    for f in features:
+        dream, _, _ = eam.recall(f)
+        dreams.append(dream)
+    dreams = rsize_recall(np.array(dreams, dtype=float),msize, min_value, max_value)
+    return dreams
+
+def dreaming_per_fold(features, chosen, eam, min_value, max_value,
+        msize, cycles, es, fold):
+    model_prefix = constants.model_name(es)
+    filename = constants.encoder_filename(model_prefix, es, fold)
+    encoder = tf.keras.models.load_model(filename)
+    filename = constants.classifier_filename(model_prefix, es, fold)
+    classifier = tf.keras.models.load_model(filename)
+    filename = constants.decoder_filename(model_prefix, es, fold)
+    decoder = tf.keras.models.load_model(filename)
+    for i in range(cycles):
+        dreams = dreams_by_memory(features, eam, msize, min_value, max_value)
+        images = decoder.predict(dreams)
+        classification = classifier.predict(dreams)
+        msize_suffix = constants.msize_suffix(msize)
+        suffix = msize_suffix + constants.dream_depth_suffix(i)
+        prefix = constants.classification_name(es) + suffix
+        filename = constants.csv_filename(prefix, es, fold)
+        np.savetxt(filename, classification)
+        store_dreams(images, chosen, suffix, es, fold)
+        features = encoder.predict(images)
+        features = msize_features(features, msize, min_value, max_value)
+
+def dreaming(msize, mfill, cycles, es):
+    filename = constants.csv_filename(constants.chosen_prefix, es)
+    chosen = np.genfromtxt(filename, dtype=int, delimiter=',', skip_header=1)
+
+    for fold in range(constants.n_folds):
+        print(f'Fold: {fold}')
+        gc.collect()
+        suffix = constants.filling_suffix
+        filling_features_filename = constants.features_name(es) + suffix
+        filling_features_filename = constants.data_filename(
+            filling_features_filename, es, fold)
+        filling_labels_filename = constants.labels_name(es) + suffix
+        filling_labels_filename = constants.data_filename(
+            filling_labels_filename, es, fold)
+
+        suffix = constants.testing_suffix
+        testing_features_filename = constants.features_name(es) + suffix
+        testing_features_filename = constants.data_filename(
+            testing_features_filename, es, fold)
+        testing_labels_filename = constants.labels_name(es) + suffix
+        testing_labels_filename = constants.data_filename(
+            testing_labels_filename, es, fold)
+
+        filling_features = np.load(filling_features_filename)
+        filling_labels = np.load(filling_labels_filename)
+        testing_features = np.load(testing_features_filename)
+        testing_labels = np.load(testing_labels_filename)
+
+        invalid = invalid_choices(chosen, testing_labels)
+        if invalid:
+            print(f'There are invalid choices in the chosen cases: {invalid}')
+            exit(1)
+        testing_features = np.array([testing_features[i] for i in chosen[:,1]], dtype=int)
+        testing_labels = np.array([testing_labels[i] for i in chosen[:,1]], dtype=int)
+        print(testing_labels)
+
+        max_value = maximum((filling_features, testing_features))
+        min_value = minimum((filling_features, testing_features))
+
+        filling_rounded = msize_features(filling_features, msize, min_value, max_value)
+        testing_rounded = msize_features(testing_features, msize, min_value, max_value)
+
+        # Create the memory.
+        p = es.mem_params
+        eam = AssociativeMemory(
+            constants.domain, msize, p[constants.xi_idx], p[constants.sigma_idx],
+            p[constants.iota_idx], p[constants.kappa_idx])
+
+        # Registrate filling data.
+        for features in filling_rounded:
+            eam.register(features)
+        dreaming_per_fold(testing_rounded, chosen, eam, min_value, max_value,
+                msize, cycles, es, fold)
+
+def invalid_choices(chosen, testing_labels):
+    invalid = []
+    n = len(testing_labels)
+    for i in len(chosen):
+        if chosen[i,1] >= n:
+            invalid.append((chosen[i,0], chosen[i,1]))
+    if invalid:
+        return invalid
+    labels = [testing_labels[i] for i in chosen[:,1]]
+    for c, l in zip(chosen[:,0], labels):
+        if c != l:
+            invalid.append((c,l))
+    return invalid
 
 ##############################################################################
 # Main section
@@ -955,6 +1058,10 @@ def generate_memories(es):
         remember(msize, mfill, es)
         decode_memories(msize, es)
 
+def dream(es):
+    learned = load_learned_params(es)
+    for msize, mfill in learned:
+        dreaming(msize, mfill, constants.dreaming_cycles, es)
 
 if __name__ == "__main__":
     args = docopt(__doc__)
@@ -993,3 +1100,5 @@ if __name__ == "__main__":
             print(f'Experiment number not valid: {experiment}')
     elif args['-r']:
         generate_memories(exp_settings)
+    elif args['-d']:
+        dream(exp_settings)

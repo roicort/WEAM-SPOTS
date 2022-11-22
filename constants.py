@@ -27,6 +27,7 @@ idx_digits = 3
 image_path = 'images'
 testing_path = 'test'
 memories_path = 'memories'
+dreams_path = 'dreams'
 
 data_prefix = 'data'
 labels_prefix = 'labels'
@@ -44,6 +45,7 @@ classification_noised_prefix = 'classif-noised'
 stats_prefix = 'model_stats'
 learn_params_prefix ='learn_params'
 memory_parameters_prefix='mem_params'
+chosen_prefix = 'chosen'
 
 balanced_data = 'balanced'
 seed_data = 'seed'
@@ -80,7 +82,7 @@ learning_suffixes = [[original_suffix], [agreed_suffix], [amsystem_suffix],
 domain = 256
 n_folds = 1
 n_jobs = 1
-
+dreaming_cycles = 7
 
 iota_default = 0.0
 kappa_default = 0.0
