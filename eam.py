@@ -909,18 +909,20 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
     classifier = tf.keras.models.load_model(filename)
     filename = constants.decoder_filename(model_prefix, es, fold)
     decoder = tf.keras.models.load_model(filename)
-    for i in range(cycles):
-        dreams = dreams_by_memory(features, eam, msize, min_value, max_value)
-        images = decoder.predict(dreams)
-        classification = classifier.predict(dreams)
-        msize_suffix = constants.msize_suffix(msize)
-        suffix = msize_suffix + constants.dream_depth_suffix(i)
-        prefix = constants.classification_name(es) + suffix
-        filename = constants.csv_filename(prefix, es, fold)
-        np.savetxt(filename, classification)
-        store_dreams(images, chosen, suffix, es, fold)
-        features = encoder.predict(images)
-        features = msize_features(features, msize, min_value, max_value)
+    for sigma in constants.sigma_values:
+        for i in range(cycles):
+            dreams = dreams_by_memory(features, eam, msize, min_value, max_value)
+            images = decoder.predict(dreams)
+            classification = classifier.predict(dreams)
+            suffix = constants.msize_suffix(msize)
+            suffix += constants.sigma_suffix(sigma)
+            suffix += constants.dream_depth_suffix(i)
+            prefix = constants.classification_name(es) + suffix
+            filename = constants.csv_filename(prefix, es, fold)
+            np.savetxt(filename, classification)
+            store_dreams(images, chosen, suffix, es, fold)
+            features = encoder.predict(images)
+            features = msize_features(features, msize, min_value, max_value)
 
 def dreaming(msize, mfill, cycles, es):
     filename = constants.csv_filename(constants.chosen_prefix, es)
@@ -933,9 +935,6 @@ def dreaming(msize, mfill, cycles, es):
         filling_features_filename = constants.features_name(es) + suffix
         filling_features_filename = constants.data_filename(
             filling_features_filename, es, fold)
-        filling_labels_filename = constants.labels_name(es) + suffix
-        filling_labels_filename = constants.data_filename(
-            filling_labels_filename, es, fold)
 
         suffix = constants.testing_suffix
         testing_features_filename = constants.features_name(es) + suffix
@@ -946,7 +945,6 @@ def dreaming(msize, mfill, cycles, es):
             testing_labels_filename, es, fold)
 
         filling_features = np.load(filling_features_filename)
-        filling_labels = np.load(filling_labels_filename)
         testing_features = np.load(testing_features_filename)
         testing_labels = np.load(testing_labels_filename)
 
@@ -954,6 +952,8 @@ def dreaming(msize, mfill, cycles, es):
         if invalid:
             print(f'There are invalid choices in the chosen cases: {invalid}')
             exit(1)
+        total = round(len(filling_features)*mfill/100.0)
+        filling_features = filling_features[:total]
         testing_features = np.array([testing_features[i] for i in chosen[:,1]], dtype=int)
         testing_labels = np.array([testing_labels[i] for i in chosen[:,1]], dtype=int)
         print(testing_labels)
