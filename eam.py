@@ -922,8 +922,11 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
     for sigma in constants.sigma_values:
         es.mem_params[constants.sigma_idx] = sigma
         eam.sigma = sigma
+        recognized = np.full(len(features), True)
         for i in range(cycles):
-            dreams, recognized = dreams_by_memory(features, eam, msize, min_value, max_value)
+            dreams, latest_recog = dreams_by_memory(features, eam, msize, min_value, max_value)
+            recognized = np.logical_and(recognized, latest_recog)
+            print(f'Recognized: {recognized}')
             images = fix_unrecognized(decoder.predict(dreams), recognized, unknown)
             classification = np.argmax(classifier.predict(dreams), axis=1)
             suffix = constants.msize_suffix(msize)
