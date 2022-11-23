@@ -910,7 +910,7 @@ def fix_unrecognized(images, recognized, unknown):
     return np.array(fixed, dtype=int)
 
 def dreaming_per_fold(features, chosen, eam, min_value, max_value,
-        msize, cycles, es, fold):
+        msize, cycles, noised, es, fold):
     model_prefix = constants.model_name(es)
     filename = constants.encoder_filename(model_prefix, es, fold)
     encoder = tf.keras.models.load_model(filename)
@@ -929,7 +929,8 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
             print(f'Recognized: {recognized}')
             images = fix_unrecognized(decoder.predict(dreams), recognized, unknown)
             classification = np.argmax(classifier.predict(dreams), axis=1)
-            suffix = constants.msize_suffix(msize)
+            suffix = constants.noised_suffix if noised else ''
+            suffix += constants.msize_suffix(msize)
             suffix += constants.sigma_suffix(sigma)
             suffix += constants.dream_depth_suffix(i)
             prefix = constants.classification_name(es) + suffix
@@ -943,6 +944,11 @@ def dreaming(msize, mfill, cycles, es):
     filename = constants.csv_filename(constants.chosen_prefix, es)
     chosen = np.genfromtxt(filename, dtype=int, delimiter=',')
     print(chosen)
+    invalid = invalid_choices(chosen, testing_labels)
+    if invalid:
+        print(f'There are invalid choices in the chosen cases: {invalid}')
+        return
+
     for fold in range(constants.n_folds):
         print(f'Fold: {fold}')
         gc.collect()
@@ -959,14 +965,16 @@ def dreaming(msize, mfill, cycles, es):
         testing_labels_filename = constants.data_filename(
             testing_labels_filename, es, fold)
 
+        suffix = constants.noised_suffix
+        noised_features_filename = constants.features_name(es) + suffix
+        noised_features_filename = constants.data_filename(
+            noised_features_filename, es, fold)
+
         filling_features = np.load(filling_features_filename)
         testing_features = np.load(testing_features_filename)
+        noised_features = np.load(noised_features_filename)
         testing_labels = np.load(testing_labels_filename)
 
-        invalid = invalid_choices(chosen, testing_labels)
-        if invalid:
-            print(f'There are invalid choices in the chosen cases: {invalid}')
-            exit(1)
         total = round(len(filling_features)*mfill/100.0)
         filling_features = filling_features[:total]
         testing_features = np.array([testing_features[i] for i in chosen[:,1]], dtype=int)
@@ -975,21 +983,23 @@ def dreaming(msize, mfill, cycles, es):
 
         max_value = maximum((filling_features, testing_features))
         min_value = minimum((filling_features, testing_features))
-
         filling_rounded = msize_features(filling_features, msize, min_value, max_value)
         testing_rounded = msize_features(testing_features, msize, min_value, max_value)
+        noised_rounded = msize_features(noised_features, msize, min_value, max_value)
 
-        # Create the memory.
+        # Creates the memory and registrates filling data. 
         p = es.mem_params
         eam = AssociativeMemory(
             constants.domain, msize, p[constants.xi_idx], p[constants.sigma_idx],
             p[constants.iota_idx], p[constants.kappa_idx])
-
-        # Registrate filling data.
         for features in filling_rounded:
             eam.register(features)
+
+        # Run the sequences.
         dreaming_per_fold(testing_rounded, chosen, eam, min_value, max_value,
-                msize, cycles, es, fold)
+                msize, cycles, False, es, fold)
+        dreaming_per_fold(noised_rounded, chosen, eam, min_value, max_value,
+                msize, cycles, True, es, fold)
 
 def invalid_choices(chosen, testing_labels):
     invalid = []
