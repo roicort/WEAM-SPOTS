@@ -83,7 +83,7 @@ learning_suffixes = [[original_suffix], [agreed_suffix], [amsystem_suffix],
 domain = 256
 n_folds = 1
 n_jobs = 1
-dreaming_cycles = 7
+dreaming_cycles = 6
 
 iota_default = 0.0
 kappa_default = 0.0

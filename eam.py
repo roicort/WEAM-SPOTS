@@ -941,14 +941,6 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
             features = msize_features(features, msize, min_value, max_value)
 
 def dreaming(msize, mfill, cycles, es):
-    filename = constants.csv_filename(constants.chosen_prefix, es)
-    chosen = np.genfromtxt(filename, dtype=int, delimiter=',')
-    print(chosen)
-    invalid = invalid_choices(chosen, testing_labels)
-    if invalid:
-        print(f'There are invalid choices in the chosen cases: {invalid}')
-        return
-
     for fold in range(constants.n_folds):
         print(f'Fold: {fold}')
         gc.collect()
@@ -974,6 +966,14 @@ def dreaming(msize, mfill, cycles, es):
         testing_features = np.load(testing_features_filename)
         noised_features = np.load(noised_features_filename)
         testing_labels = np.load(testing_labels_filename)
+
+        filename = constants.csv_filename(constants.chosen_prefix, es)
+        chosen = np.genfromtxt(filename, dtype=int, delimiter=',')
+        print(chosen)
+        invalid = invalid_choices(chosen, testing_labels)
+        if invalid:
+            print(f'There are invalid choices in the chosen cases for fold {fold}: {invalid}')
+            return
 
         total = round(len(filling_features)*mfill/100.0)
         filling_features = filling_features[:total]
