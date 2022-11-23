@@ -978,6 +978,7 @@ def dreaming(msize, mfill, cycles, es):
         total = round(len(filling_features)*mfill/100.0)
         filling_features = filling_features[:total]
         testing_features = np.array([testing_features[i] for i in chosen[:,1]], dtype=int)
+        noised_features = np.array([noised_features[i] for i in chosen[:,1]], dtype=int)
         testing_labels = np.array([testing_labels[i] for i in chosen[:,1]], dtype=int)
         print(testing_labels)
 
