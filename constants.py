@@ -24,6 +24,9 @@ import numpy as np
 data_path = 'data/fashion'
 run_path = 'runs'
 idx_digits = 3
+prep_data_fname = 'prep_data.npy'
+pred_noised_data_fname = 'prep_noised_data.npy'
+prep_labels_fname = 'prep_labels.npy'
 
 image_path = 'images'
 testing_path = 'test'
@@ -370,10 +373,17 @@ def padding_cropping(data, n_frames):
         return features
 
 def get_data_in_range(data, i, j):
-    if j >= i:
+    if j > i:
         return data[i:j]
     else:
-        return data[i:] + data[:j]
+        pre = data[i:]
+        pos = data[:j]
+        if len(pre) == 0:
+            return pos
+        elif len(pos) == 0:
+            return pre
+        else:
+            return pre + pos
 
 def print_csv(data):
     writer = csv.writer(sys.stdout)
