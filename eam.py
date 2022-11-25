@@ -20,13 +20,14 @@ Usage:
   eam (-n | -f | -e <experiment> | -r | -d) [--runpath=<runpath>] [ -l (en | es) ]
 
 Options:
-  -h        Show this screen.
-  -n        Trains the neural network (classifier+autoencoder).
-  -f        Generates Features for all data using the encoder.
-  -e        Run the experiment (options 1 or 2).
-  -r        Generate images from testing data and memories of them.
-  -d        Recurrent generation of memories.
-  --runpath=<runpath> Sets the path to the directory where everything will be saved [default: runs]
+  -h    Show this screen.
+  -n    Trains the neural network (classifier+autoencoder).
+  -f    Generates Features for all data using the encoder.
+  -e    Run the experiment (options 1 or 2).
+  -r    Generate images from testing data and memories of them.
+  -d    Recurrent generation of memories.
+  --runpath=<runpath>   Path to directory where everything
+        will be saved [default: runs]
   -l        Chooses Language for graphs.
 """
 
@@ -1111,7 +1112,8 @@ if __name__ == "__main__":
         es.install()
 
     # Processing runpath.
-    constants.run_path = args['--runpath']
+    if args['--runpath']:
+        constants.run_path = args['<runpath>']
 
     prefix = constants.memory_parameters_prefix
     filename = constants.csv_filename(prefix)
