@@ -66,7 +66,7 @@ def get_encoder():
     dropout += 0.9
     output = conv_block(output, 3, filters, dropout)
     output = Flatten()(output)
-    output = LayerNormalization(name = 'encoder')(output)
+    output = LayerNormalization(name = 'encoded')(output)
     return input_data, output
 
 def get_decoder():
@@ -88,7 +88,7 @@ def get_decoder():
         filters = filters // 2 
         output = BatchNormalization()(output)
     output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
-    output_img = Rescaling(255.0, name='autoencoder')(output)
+    output_img = Rescaling(255.0, name='decoded')(output)
     return input_mem, output_img
 
 # The number of layers defined in get_classifier.
@@ -103,7 +103,7 @@ def get_classifier():
     dense = Dense(constants.domain, activation='relu')(drop)
     drop = Dropout(0.4)(dense)
     classification = Dense(constants.n_labels,
-        activation='softmax', name='classifier')(drop)
+        activation='softmax', name='classified')(drop)
     return input_mem, classification
 
 class EarlyStopping(Callback):
@@ -191,39 +191,39 @@ def train_network(prefix, es):
         input_data = Input(shape=(dataset.columns, dataset.rows, 1))
 
         input_enc, encoded = get_encoder()
-        encoder = Model(input_enc, encoded)
+        encoder = Model(input_enc, encoded, name='encoder')
         encoder.compile(optimizer = 'adam')
         encoder.summary()
         input_cla, classified = get_classifier()
-        classifier = Model(input_cla, classified)
+        classifier = Model(input_cla, classified, name='classifier')
         classifier.compile(
             loss = 'categorical_crossentropy', optimizer = 'adam',
             metrics = 'accuracy')
         classifier.summary()
         input_dec, decoded = get_decoder()
-        decoder = Model(input_dec, decoded)
+        decoder = Model(input_dec, decoded, name='decoder')
         decoder.compile(
             optimizer = 'adam', loss = 'mean_squared_error', metrics = rmse)
         decoder.summary()
         encoded = encoder(input_data)
         decoded = decoder(encoded)
         classified = classifier(encoded)
-        full_classifier = Model(inputs=input_data, outputs=classified)
+        full_classifier = Model(inputs=input_data, outputs=classified, name='full_classifier')
         full_classifier.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = 'accuracy') 
-        autoencoder = Model(inputs = input_data, outputs=decoded)
+        autoencoder = Model(inputs = input_data, outputs=decoded, name='autoencoder')
         autoencoder.compile(loss='huber', optimizer='adam', metrics=rmse)
 
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
                     optimizer='adam',
-                    metrics={'model_1': 'accuracy', 'model_2': rmse})
+                    metrics={'full_classifier': 'accuracy', 'autoencoder': rmse})
         model.summary()
         history = model.fit(training_data,
                 (training_labels, training_data),
                 batch_size=batch_size,
                 epochs=epochs,
                 validation_data= (validation_data,
-                    {'model_1': validation_labels, 'model_2': validation_data}),
+                    {'full_classifier': validation_labels, 'autoencoder': validation_data}),
                 callbacks=[EarlyStopping()],
                 verbose=2)
         histories.append(history)
