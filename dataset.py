@@ -38,6 +38,7 @@ def _get_segment(segment, fold, noised = False):
             or (_get_segment.labels is None):
         _get_segment.data, _get_segment.noised, _get_segment.labels = \
             _load_dataset(constants.data_path)
+    print('Delimiting segment of data.')
     total = len(_get_segment.labels)
     training = total*constants.nn_training_percent
     filling = total*constants.am_filling_percent
@@ -68,9 +69,13 @@ _get_segment.noised = None
 _get_segment.labels = None
 
 def noised(data, percent):
+    print(f'Adding {percent}% noise to data.')
     copy = np.zeros(data.shape, dtype=float)
+    n = 0
     for i in range(len(copy)):
         copy[i] = _noised(data[i], percent)
+        n += 1
+        constants.print_counter(n, 10000, step=100)
     return copy
 
 def _noised(image, percent):
@@ -108,6 +113,7 @@ def _preprocessed_dataset(path):
     noised_fname = os.path.join(path, constants.pred_noised_data_fname)
     labels_fname = os.path.join(path, constants.prep_labels_fname)
     data = None
+    noised = None
     labels = None
     try:
         data = np.load(data_fname)
@@ -119,6 +125,7 @@ def _preprocessed_dataset(path):
     return data, noised, labels
 
 def _save_dataset(data, noised, labels, path):
+    print('Saving preprocessed dataset')
     data_fname = os.path.join(path, constants.prep_data_fname)
     noised_fname = os.path.join(path, constants.pred_noised_data_fname)
     labels_fname = os.path.join(path, constants.prep_labels_fname)
@@ -140,6 +147,7 @@ def _load_mnist(path, kind='train'):
     return images, labels
 
 def _shuffle(data, noised, labels):
+    print('Shuffling data and labels')
     tuples = [(data[i], noised[i], labels[i]) for i in range(len(labels))]
     random.shuffle(tuples)
     data = np.array([p[0] for p in tuples])

@@ -136,10 +136,10 @@ class EarlyStopping(Callback):
     def on_epoch_end(self, epoch, logs=None):
         loss = logs.get('loss')
         val_loss = logs.get('val_loss')
-        accuracy = logs.get('model_1_accuracy')
-        val_accuracy = logs.get('val_model_1_accuracy')
-        rmse = logs.get('model_2_root_mean_squared_error')
-        val_rmse = logs.get('val_model_2_root_mean_squared_error')
+        accuracy = logs.get('classifier_accuracy')
+        val_accuracy = logs.get('val_classifier_accuracy')
+        rmse = logs.get('decoder_root_mean_squared_error')
+        val_rmse = logs.get('val_decoder_root_mean_squared_error')
 
         if epoch < self.start:
             self.best_weights = self.model.get_weights()
@@ -216,14 +216,14 @@ def train_network(prefix, es):
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
                     optimizer='adam',
-                    metrics={'full_classifier': 'accuracy', 'autoencoder': rmse})
+                    metrics={'classifier': 'accuracy', 'decoder': rmse})
         model.summary()
         history = model.fit(training_data,
                 (training_labels, training_data),
                 batch_size=batch_size,
                 epochs=epochs,
                 validation_data= (validation_data,
-                    {'full_classifier': validation_labels, 'autoencoder': validation_data}),
+                    {'classifier': validation_labels, 'decoder': validation_data}),
                 callbacks=[EarlyStopping()],
                 verbose=2)
         histories.append(history)

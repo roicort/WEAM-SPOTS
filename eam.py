@@ -17,7 +17,7 @@
 
 Usage:
   eam -h | --help
-  eam (-n | -f | -e <experiment> | -r | -d) [--runpath=<runpath>] [ -l (en | es) ]
+  eam (-n | -f | -e <experiment> | -r | -d) [--runpath=PATH ] [ -l (en | es) ]
 
 Options:
   -h    Show this screen.
@@ -26,8 +26,7 @@ Options:
   -e    Run the experiment (options 1 or 2).
   -r    Generate images from testing data and memories of them.
   -d    Recurrent generation of memories.
-  --runpath=<runpath>   Path to directory where everything
-        will be saved [default: runs]
+  --runpath=PATH   Path to directory where everything will be saved [default: runs]
   -l        Chooses Language for graphs.
 """
 
@@ -1113,7 +1112,7 @@ if __name__ == "__main__":
 
     # Processing runpath.
     if args['--runpath']:
-        constants.run_path = args['<runpath>']
+        constants.run_path = args['--runpath']
 
     prefix = constants.memory_parameters_prefix
     filename = constants.csv_filename(prefix)
