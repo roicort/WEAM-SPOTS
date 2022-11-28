@@ -384,7 +384,7 @@ def get_data_in_range(data, i, j):
         elif len(pos) == 0:
             return pre
         else:
-            return pre + pos
+            return np.concatenate((pre,pos), axis=0)
 
 def print_csv(data):
     writer = csv.writer(sys.stdout)
