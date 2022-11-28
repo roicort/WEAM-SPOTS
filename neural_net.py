@@ -251,38 +251,31 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
     Uses the previously trained neural networks for generating the features.
     """
     for fold in range(constants.n_folds):
-        training_data, _ = dataset.get_training(fold)
-        filling_data = dataset.get_filling(fold)
-        testing_data = dataset.get_testing(fold)
-        noised_data = dataset.get_testing(fold, noised = True)
-
-        suffix = constants.training_suffix
-        training_features_prefix = features_prefix + suffix        
-        training_features_filename = \
-            constants.data_filename(training_features_prefix, es, fold)
-        suffix = constants.filling_suffix
-        filling_features_prefix = features_prefix + suffix        
-        filling_features_filename = \
-            constants.data_filename(filling_features_prefix, es, fold)
-        suffix = constants.testing_suffix
-        testing_features_prefix = features_prefix + suffix        
-        testing_features_filename = \
-            constants.data_filename(testing_features_prefix, es, fold)
-        suffix = constants.noised_suffix
-        noised_features_prefix = features_prefix + suffix        
-        noised_features_filename = \
-            constants.data_filename(noised_features_prefix, es, fold)
-
         # Load de encoder
         filename = constants.encoder_filename(model_prefix, es, fold)
         model = tf.keras.models.load_model(filename)
         model.summary()
 
-        training_features = model.predict(training_data)
-        filling_features = model.predict(filling_data)
-        testing_features = model.predict(testing_data)
-        noised_features = model.predict(noised_data)
-        np.save(training_features_filename, training_features)
-        np.save(filling_features_filename, filling_features)
-        np.save(testing_features_filename, testing_features)
-        np.save(noised_features_filename, noised_features)
+        training_data, training_labels = dataset.get_training(fold)
+        filling_data, filling_labels = dataset.get_filling(fold)
+        testing_data, testing_labels = dataset.get_testing(fold)
+        noised_data, noised_labels = dataset.get_testing(fold, noised = True)
+        settings = [
+            (training_data, training_labels, constants.training_suffix),
+            (filling_data, filling_labels, constants.filling_suffix),
+            (testing_data, testing_labels, constants.testing_suffix),
+            (noised_data, noised_labels, constants.noised_suffix),
+        ]
+        for s in settings:
+            data = s[0]
+            labels = s[1]
+            suffix = s[2]
+            features_prefix = features_prefix + suffix
+            labels_prefix = labels_prefix + suffix
+            features_filename = \
+                constants.data_filename(features_prefix, es, fold)
+            labels_filename = \
+                constants.data_filename(labels_prefix, es, fold)
+            features = model.predict(data)
+            np.save(features_filename, features)
+            np.save(labels_filename, labels)
