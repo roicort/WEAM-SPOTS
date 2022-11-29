@@ -979,8 +979,9 @@ def dreaming(msize, mfill, cycles, es):
         noised_features = np.load(noised_features_filename)
         testing_labels = np.load(testing_labels_filename)
 
-        label, index = *chosen[fold]
-        if invalid_choice(label, index, testing_labels):
+        label = chosen[fold,0]
+        index = chosen[fold,1]
+        if not valid_choice(label, index, testing_labels):
             print(
                 f'There is an invalid choice in the chosen cases for fold {fold}.')
             return
@@ -1014,7 +1015,8 @@ def dreaming(msize, mfill, cycles, es):
                           msize, cycles, True, es, fold)
 
 
-def invalid_choice(label, index, testing_labels):
+def valid_choice(label, index, testing_labels):
+    print(f'Validating {label} against {testing_labels[index]} in position {index}')
     return testing_labels[index] == label
 
 ##############################################################################
