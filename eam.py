@@ -896,11 +896,9 @@ def store_noised_memory(memory, directory, idx, label, es, fold):
     store_image(memory_filename, memory)
 
 
-def store_dreams(dreams, chosen, suffix, es, fold):
+def store_dream(dream, label, index, suffix, es, fold):
     dreams_path = constants.dreams_path + suffix
-    for (dream, label, idx) in \
-            zip(dreams, chosen[:, 0], chosen[:, 1]):
-        store_memory(dream, dreams_path, idx, label, es, fold)
+    store_memory(dream, dreams_path, index, label, es, fold)
 
 
 def store_image(filename, array):
@@ -909,24 +907,11 @@ def store_image(filename, array):
     png.from_array(pixels, 'L;8').save(filename)
 
 
-def dreams_by_memory(features, eam, msize, min_value, max_value):
-    dreams = []
-    recognized = []
-    for f in features:
-        dream, recog, _ = eam.recall(f)
-        dreams.append(dream)
-        recognized.append(recog)
-    dreams = rsize_recall(np.array(dreams, dtype=float),
+def dream_by_memory(features, eam, msize, min_value, max_value):
+    dream, recognized, _ = eam.recall(features)
+    dream = rsize_recall(np.array(dream, dtype=float),
                           msize, min_value, max_value)
-    return dreams, recognized
-
-
-def fix_unrecognized(images, recognized, unknown):
-    fixed = []
-    for image, recog in zip(images, recognized):
-        correct = image if recog else unknown
-        fixed.append(correct)
-    return np.array(fixed, dtype=int)
+    return dream, recognized
 
 
 def dreaming_per_fold(features, chosen, eam, min_value, max_value,
@@ -939,31 +924,35 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
     filename = constants.decoder_filename(model_prefix, es, fold)
     decoder = tf.keras.models.load_model(filename)
     unknown = np.zeros((dataset.rows, dataset.columns, 1), dtype=int)
+    suffix = constants.noised_suffix if noised else ''
+    suffix += constants.msize_suffix(msize)
+
     for sigma in constants.sigma_values:
         es.mem_params[constants.sigma_idx] = sigma
         eam.sigma = sigma
-        recognized = np.full(len(features), True)
+        recognized = True
+        sgm_suffix = suffix + constants.sigma_suffix(sigma)
         for i in range(cycles):
-            dreams, latest_recog = dreams_by_memory(
+            dream, recog = dream_by_memory(
                 features, eam, msize, min_value, max_value)
-            recognized = np.logical_and(recognized, latest_recog)
+            recognized = recognized and recog
             print(f'Recognized: {recognized}')
-            images = fix_unrecognized(
-                decoder.predict(dreams), recognized, unknown)
-            classification = np.argmax(classifier.predict(dreams), axis=1)
-            suffix = constants.noised_suffix if noised else ''
-            suffix += constants.msize_suffix(msize)
-            suffix += constants.sigma_suffix(sigma)
-            suffix += constants.dream_depth_suffix(i)
-            prefix = constants.classification_name(es) + suffix
-            filename = constants.csv_filename(prefix, es, fold)
-            np.savetxt(filename, classification)
-            store_dreams(images, chosen, suffix, es, fold)
-            features = encoder.predict(images)
+            image = decoder.predict(np.array([dream,]))[0] if recognized else unknown
+            classification = np.argmax(classifier.predict(np.array([dream,])), axis=1)[0]
+            full_suffix = sgm_suffix + constants.dream_depth_suffix(i)
+            store_dream(image, *chosen[fold], full_suffix, es, fold)
+            features = encoder.predict(np.array([image,]))[0]
             features = msize_features(features, msize, min_value, max_value)
+    prefix = constants.classification_name(es) + suffix
+    filename = constants.csv_filename(prefix, es, fold)
+    np.savetxt(filename, classification)
 
 
 def dreaming(msize, mfill, cycles, es):
+    filename = constants.csv_filename(constants.chosen_prefix, es)
+    chosen = np.genfromtxt(filename, dtype=int, delimiter=',')
+    print(chosen)
+
     for fold in range(constants.n_folds):
         print(f'Fold: {fold}')
         gc.collect()
@@ -990,27 +979,19 @@ def dreaming(msize, mfill, cycles, es):
         noised_features = np.load(noised_features_filename)
         testing_labels = np.load(testing_labels_filename)
 
-        filename = constants.csv_filename(constants.chosen_prefix, es)
-        chosen = np.genfromtxt(filename, dtype=int, delimiter=',')
-        print(chosen)
-        invalid = invalid_choices(chosen, testing_labels)
-        if invalid:
+        label, index = *chosen[fold]
+        if invalid_choice(label, index, testing_labels):
             print(
-                f'There are invalid choices in the chosen cases for fold {fold}: {invalid}')
+                f'There is an invalid choice in the chosen cases for fold {fold}.')
             return
 
         total = round(len(filling_features)*mfill/100.0)
         filling_features = filling_features[:total]
-        testing_features = np.array([testing_features[i]
-                                    for i in chosen[:, 1]], dtype=int)
-        noised_features = np.array([noised_features[i]
-                                   for i in chosen[:, 1]], dtype=int)
-        testing_labels = np.array([testing_labels[i]
-                                  for i in chosen[:, 1]], dtype=int)
-        print(testing_labels)
+        testing_features = testing_features[index]
+        noised_features = noised_features[index]
 
-        max_value = maximum((filling_features, testing_features))
-        min_value = minimum((filling_features, testing_features))
+        max_value = maximum((filling_features))
+        min_value = minimum((filling_features))
         filling_rounded = msize_features(
             filling_features, msize, min_value, max_value)
         testing_rounded = msize_features(
@@ -1033,19 +1014,8 @@ def dreaming(msize, mfill, cycles, es):
                           msize, cycles, True, es, fold)
 
 
-def invalid_choices(chosen, testing_labels):
-    invalid = []
-    n = len(testing_labels)
-    for i in range(len(chosen)):
-        if chosen[i, 1] >= n:
-            invalid.append((chosen[i, 0], chosen[i, 1]))
-    if invalid:
-        return invalid
-    labels = [testing_labels[i] for i in chosen[:, 1]]
-    for c, l in zip(chosen[:, 0], labels):
-        if c != l:
-            invalid.append((c, l))
-    return invalid
+def invalid_choice(label, index, testing_labels):
+    return testing_labels[index] == label
 
 ##############################################################################
 # Main section
