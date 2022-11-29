@@ -270,12 +270,10 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
             data = s[0]
             labels = s[1]
             suffix = s[2]
-            features_prefix = features_prefix + suffix
-            labels_prefix = labels_prefix + suffix
             features_filename = \
-                constants.data_filename(features_prefix, es, fold)
+                constants.data_filename(features_prefix + suffix, es, fold)
             labels_filename = \
-                constants.data_filename(labels_prefix, es, fold)
+                constants.data_filename(labels_prefix + suffix, es, fold)
             features = model.predict(data)
             np.save(features_filename, features)
             np.save(labels_filename, labels)
