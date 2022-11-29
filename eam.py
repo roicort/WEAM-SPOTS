@@ -926,7 +926,7 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
     unknown = np.zeros((dataset.rows, dataset.columns, 1), dtype=int)
     suffix = constants.noised_suffix if noised else ''
     suffix += constants.msize_suffix(msize)
-
+    classification = []
     for sigma in constants.sigma_values:
         es.mem_params[constants.sigma_idx] = sigma
         eam.sigma = sigma
@@ -938,7 +938,8 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
             recognized = recognized and recog
             print(f'Recognized: {recognized}')
             image = decoder.predict(np.array([dream,]))[0] if recognized else unknown
-            classification = np.argmax(classifier.predict(np.array([dream,])), axis=1)[0]
+            classif = np.argmax(classifier.predict(np.array([dream,])), axis=1)[0]
+            classification.append(classif)
             full_suffix = sgm_suffix + constants.dream_depth_suffix(i)
             store_dream(image, *chosen[fold], full_suffix, es, fold)
             features = encoder.predict(np.array([image,]))[0]
