@@ -17,7 +17,7 @@
 
 Usage:
   eam -h | --help
-  eam (-n | -f | -e <experiment> | -r | -d) [--runpath=PATH ] [ -l (en | es) ]
+  eam (-n | -f | -e <experiment> | -r | -d) [--domain=DOMAIN] [--runpath=PATH ] [ -l (en | es) ]
 
 Options:
   -h    Show this screen.
@@ -26,6 +26,7 @@ Options:
   -e    Run the experiment (options 1 or 2).
   -r    Generate images from testing data and memories of them.
   -d    Recurrent generation of memories.
+  --domain=DOMAIN   Size of memory (columns). Defaults to value of constants.domain
   --runpath=PATH   Path to directory where everything will be saved [default: runs]
   -l        Chooses Language for graphs.
 """
@@ -1090,6 +1091,9 @@ if __name__ == "__main__":
         es = gettext.translation('eam', localedir='locale', languages=['es'])
         es.install()
 
+    # Processing memory size (columns)
+    if args['--domain']:
+       constants.domain = int(args['--domain']) 
     # Processing runpath.
     if args['--runpath']:
         constants.run_path = args['--runpath']
@@ -1101,6 +1105,7 @@ if __name__ == "__main__":
     exp_settings = constants.ExperimentSettings(parameters)
     print(f'Working directory: {constants.run_path}')
     print(f'Experimental settings: {exp_settings}')
+    print(f'Memory size (columns): {constants.domain}')
 
     # PROCESSING OF MAIN OPTIONS.
 
