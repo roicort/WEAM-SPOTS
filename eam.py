@@ -459,13 +459,18 @@ def test_memory_sizes(domain, es):
     no_response = np.array(no_response)
     no_correct_response = np.array(no_correct_response)
     correct_response = np.array(correct_response)
-    main_no_response = np.mean(no_response, axis=0)
-    main_no_correct_response = np.mean(no_correct_response, axis=0)
-    main_correct_response = np.mean(correct_response, axis=0)
+    mean_no_response = np.mean(no_response, axis=0)
+    stdv_no_response = np.std(no_response, axis=0)
+    mean_no_correct_response = np.mean(no_correct_response, axis=0)
+    stdv_no_correct_response = np.std(no_correct_response, axis=0)
+    mean_correct_response = np.mean(correct_response, axis=0)
+    stdv_correct_response = np.std(correct_response, axis=0)
     best_memory_idx = optimum_indexes(average_precision, average_recall)
     best_memory_sizes = [constants.memory_sizes[i] for i in best_memory_idx]
-    main_behaviours = \
-        [main_no_response, main_no_correct_response, main_correct_response]
+    mean_behaviours = \
+        [mean_no_response, mean_no_correct_response, mean_correct_response]
+    stdv_behaviours = \
+        [stdv_no_response, stdv_no_correct_response, stdv_correct_response]
 
     np.savetxt(constants.csv_filename(
         'memory_precision', es), precision, delimiter=',')
@@ -473,14 +478,16 @@ def test_memory_sizes(domain, es):
         'memory_recall', es), recall, delimiter=',')
     np.savetxt(constants.csv_filename(
         'memory_entropy', es), all_entropies, delimiter=',')
-    np.savetxt(constants.csv_filename('main_behaviours', es),
-               main_behaviours, delimiter=',')
+    np.savetxt(constants.csv_filename('mean_behaviours', es),
+               mean_behaviours, delimiter=',')
+    np.savetxt(constants.csv_filename('stdv_behaviours', es),
+               stdv_behaviours, delimiter=',')
     np.save(constants.data_filename('memory_confrixes', es), average_confrixes)
     np.save(constants.data_filename('behaviours', es), behaviours)
     plot_pre_graph(average_precision, average_recall, average_entropy,
                    stdev_precision, stdev_recall, es)
-    plot_behs_graph(main_no_response, main_no_correct_response,
-                    main_correct_response, es)
+    plot_behs_graph(mean_no_response, mean_no_correct_response,
+                    mean_correct_response, es)
     print('Memory size evaluation completed!')
     return best_memory_sizes
 
@@ -554,7 +561,7 @@ def test_filling_per_fold(mem_size, domain, es, fold):
         print(f'Filling from {start} to {end}.')
         behaviour, entropy = \
             test_filling_percent(eam, mem_size,
-                                 min_value, max_value, filling_features,
+                                 min_value, max_value, features,
                                  testing_features, testing_labels, percent, classifier)
         # A list of tuples (position, label, features)
         # fold_recalls += recalls
