@@ -34,7 +34,7 @@ def get_testing(fold, noised = False):
 
 def _get_segment(segment, fold, noised = False):
     if (_get_segment.data is None) \
-        or (_get_segment.data is None) \
+        or (_get_segment.noised is None) \
             or (_get_segment.labels is None):
         _get_segment.data, _get_segment.noised, _get_segment.labels = \
             _load_dataset(constants.data_path)
@@ -60,7 +60,9 @@ def _get_segment(segment, fold, noised = False):
     elif segment == _TESTING_SEGMENT:
         n, m = k, l
 
-    data = constants.get_data_in_range(_get_segment.data, n, m)
+    data = constants.get_data_in_range(_get_segment.noised, n, m) \
+            if noised \
+                else constants.get_data_in_range(_get_segment.data, n, m)
     labels = constants.get_data_in_range(_get_segment.labels, n, m)
     return data, labels
 
