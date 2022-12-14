@@ -6,8 +6,9 @@ es = constants.ExperimentSettings()
 # We can do this because in fashion there are the same 
 # number of labels as folds.
 chosen = np.zeros((constants.n_folds, 2), dtype=int)
-labels = [*range(constants.n_labels)]
-random.shuffle(labels)
+classes = [*range(constants.n_labels)]
+random.shuffle(classes)
+print(classes)
 for fold in range(constants.n_folds):
     prefix = constants.labels_name(es) + constants.testing_suffix
     fname = constants.data_filename(prefix, es, fold)
@@ -16,7 +17,7 @@ for fold in range(constants.n_folds):
     fname = constants.data_filename(prefix, es, fold)
     classif = np.load(fname)
 
-    label = labels[fold]
+    label = classes[fold]
     n = 0
     for l, c in zip(labels, classif):
         if (random.randrange(10) == 0) and (l == label) and (l == c):
