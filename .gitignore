@@ -4,6 +4,5 @@ runs*
 runs*/
 tmp/
 .vscode/
-results
 data
 nohup.out
