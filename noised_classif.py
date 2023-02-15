@@ -16,5 +16,5 @@ for fold in range(constants.n_folds):
     features = np.load(features_filename)
     prefix = constants.noised_classification_name(es)
     labels_filename = constants.data_filename(prefix, es, fold)
-    labels = model.predict(features)
+    labels = np.argmax(model.predict(features), axis=1)
     np.save(labels_filename, labels)
