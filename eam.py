@@ -940,9 +940,10 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
         eam.sigma = sigma
         recognized = True
         sgm_suffix = suffix + constants.sigma_suffix(sigma)
+        ft_cycle = np.array(features, copy=True)
         for i in range(cycles):
             dream, recog = dream_by_memory(
-                features, eam, msize, min_value, max_value)
+                ft_cycle, eam, msize, min_value, max_value)
             recognized = recognized and recog
             print(f'Recognized: {recognized}')
             image = decoder.predict(np.array([dream,]))[0] if recognized else unknown
@@ -950,8 +951,8 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
             classification.append(classif)
             full_suffix = sgm_suffix + constants.dream_depth_suffix(i)
             store_dream(image, *chosen[fold], full_suffix, es, fold)
-            features = encoder.predict(np.array([image,]))[0]
-            features = msize_features(features, msize, min_value, max_value)
+            ft_cycle = encoder.predict(np.array([image,]))[0]
+            ft_cycle = msize_features(features, msize, min_value, max_value)
     prefix = constants.classification_name(es) + suffix
     filename = constants.csv_filename(prefix, es, fold)
     np.savetxt(filename, classification)
