@@ -1123,4 +1123,7 @@ if __name__ == "__main__":
     elif args['-r']:
         generate_memories(exp_settings)
     elif args['-d']:
+        s = np.array(exp_settings.mem_params)
+        s[3] = 0.05
+        exp_settings.mem_params = s.tolist()
         dream(exp_settings)
