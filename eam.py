@@ -245,12 +245,6 @@ def plot_memory(memory: AssociativeMemory, prefix, es, fold):
     plt.savefig(filename, dpi=600)
 
 
-def plot_memories(ams, es, fold):
-    for label in ams:
-        prefix = f'memory-{label}-state'
-        plot_memory(ams[label], prefix, es, fold)
-
-
 def maximum(arrays):
     max = float('-inf')
     for a in arrays:
@@ -915,8 +909,8 @@ def store_image(filename, array):
     png.from_array(pixels, 'L;8').save(filename)
 
 
-def dream_by_memory(features, eam, msize, min_value, max_value):
-    dream, recognized, _ = eam.recall(features)
+def dream_by_memory(features_rounded, eam, msize, min_value, max_value):
+    dream, recognized, _ = eam.recall(features_rounded)
     dream = rsize_recall(np.array(dream, dtype=float),
                           msize, min_value, max_value)
     return dream, recognized
@@ -940,19 +934,24 @@ def dreaming_per_fold(features, chosen, eam, min_value, max_value,
         eam.sigma = sigma
         recognized = True
         sgm_suffix = suffix + constants.sigma_suffix(sigma)
-        ft_cycle = np.array(features, copy=True)
+        ft_cycle = msize_features(features, msize, min_value, max_value)
         for i in range(cycles):
-            dream, recog = dream_by_memory(
-                ft_cycle, eam, msize, min_value, max_value)
-            recognized = recognized and recog
-            print(f'Recognized: {recognized}')
-            image = decoder.predict(np.array([dream,]))[0] if recognized else unknown
-            classif = np.argmax(classifier.predict(np.array([dream,])), axis=1)[0]
+            if recognized:
+                dream, recog = dream_by_memory(
+                    ft_cycle, eam, msize, min_value, max_value)
+                print(f'Recognized: {recog}')
+                recognized = recognized and recog
+            if recognized:
+                image = decoder.predict(np.array([dream,]))[0]
+                classif = np.argmax(classifier.predict(np.array([dream,])), axis=1)[0]
+                ft_cycle = encoder.predict(np.array([image,]))[0]
+                ft_cycle = msize_features(ft_cycle, msize, min_value, max_value)
+            else:
+                image = unknown
+                classif = constants.n_labels
             classification.append(classif)
             full_suffix = sgm_suffix + constants.dream_depth_suffix(i)
-            store_dream(image, *chosen[fold], full_suffix, es, fold)
-            ft_cycle = encoder.predict(np.array([image,]))[0]
-            ft_cycle = msize_features(features, msize, min_value, max_value)
+            store_dream(image, chosen[0], chosen[1], full_suffix, es, fold)
     prefix = constants.classification_name(es) + suffix
     filename = constants.csv_filename(prefix, es, fold)
     np.savetxt(filename, classification)
@@ -988,6 +987,8 @@ def dreaming(msize, mfill, cycles, es):
         testing_features = np.load(testing_features_filename)
         noised_features = np.load(noised_features_filename)
         testing_labels = np.load(testing_labels_filename)
+        max_value = maximum((filling_features, testing_features))
+        min_value = minimum((filling_features, testing_features))
 
         label = chosen[fold,0]
         index = chosen[fold,1]
@@ -998,17 +999,11 @@ def dreaming(msize, mfill, cycles, es):
 
         total = round(len(filling_features)*mfill/100.0)
         filling_features = filling_features[:total]
-        testing_features = testing_features[index]
-        noised_features = noised_features[index]
+        testing = testing_features[index]
+        noised = noised_features[index]
 
-        max_value = maximum((filling_features))
-        min_value = minimum((filling_features))
         filling_rounded = msize_features(
             filling_features, msize, min_value, max_value)
-        testing_rounded = msize_features(
-            testing_features, msize, min_value, max_value)
-        noised_rounded = msize_features(
-            noised_features, msize, min_value, max_value)
 
         # Creates the memory and registrates filling data.
         p = es.mem_params
@@ -1019,9 +1014,9 @@ def dreaming(msize, mfill, cycles, es):
             eam.register(features)
 
         # Run the sequences.
-        dreaming_per_fold(testing_rounded, chosen, eam, min_value, max_value,
+        dreaming_per_fold(testing, chosen[fold], eam, min_value, max_value,
                           msize, cycles, False, es, fold)
-        dreaming_per_fold(noised_rounded, chosen, eam, min_value, max_value,
+        dreaming_per_fold(noised, chosen[fold], eam, min_value, max_value,
                           msize, cycles, True, es, fold)
 
 
@@ -1123,7 +1118,4 @@ if __name__ == "__main__":
     elif args['-r']:
         generate_memories(exp_settings)
     elif args['-d']:
-        s = np.array(exp_settings.mem_params)
-        s[3] = 0.05
-        exp_settings.mem_params = s.tolist()
         dream(exp_settings)
