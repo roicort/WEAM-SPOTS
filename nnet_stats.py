@@ -3,7 +3,7 @@ import constants
 
 domain_sizes = [32, 64, 128, 256, 512]
 
-def accuracy(labels, predictions):
+def accuracy_fn(labels, predictions):
     n = 0
     for l, p in zip(labels, predictions):
         n += (l == p)
@@ -15,6 +15,8 @@ if __name__ == "__main__":
     for domain in domain_sizes:
         dirname = f'{dir_prefix}{domain}'
         constants.run_path=dirname
+        print(f'Domain size: {domain}')
+        acc = []
         for fold in range(constants.n_folds):
             prefix = constants.labels_prefix + constants.testing_suffix
             filename = constants.data_filename(prefix, es, fold)
@@ -22,5 +24,10 @@ if __name__ == "__main__":
             prefix = constants.classification_name(es)
             filename = constants.data_filename(prefix, es, fold)
             predictions = np.load(filename)
-            acc = accuracy(labels, predictions)
-            print(f'{domain},{fold},{acc}')
+            accuracy = accuracy_fn(labels, predictions)
+            acc.append(accuracy)
+            print(f'\tFold: {fold}, {accuracy:.3f}')
+        acc = np.array(acc)
+        average = np.mean(acc)
+        print(f'\t\tAverage: {average:.3f}')
+        print('')

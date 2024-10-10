@@ -2,7 +2,22 @@ import numpy as np
 import constants
 import random
 
+## Set domain
+domain = 256
+constants.domain = domain
+
+## Set run path
+dirname = f'runs-{domain}'
+constants.run_path=dirname
+
+## Experimental settings
+prefix = constants.memory_parameters_prefix
+filename = constants.csv_filename(prefix)
+parameters = \
+                 np.genfromtxt(filename, dtype=float, delimiter=',', skip_header=1)
+
 es = constants.ExperimentSettings()
+
 # We can do this because in fashion there are the same 
 # number of labels as folds.
 chosen = np.zeros((constants.n_folds, 2), dtype=int)

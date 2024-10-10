@@ -64,9 +64,9 @@ class AssociativeMemory(object):
         self._scale = normpdf(0, 0, self._sigma)
 
         # It is m+1 to handle partial functions.
-        self._relation = np.zeros((self._m, self._n), dtype=np.int)
+        self._relation = np.zeros((self._m, self._n), dtype='int16')
         # Iota moderated relation
-        self._iota_relation = np.zeros((self._m, self._n), dtype=np.int)
+        self._iota_relation = np.zeros((self._m, self._n), dtype='int16')
         self._entropies = np.zeros(self._n, dtype=float)
         self._means = np.zeros(self._n, dtype=float)
 
@@ -186,7 +186,7 @@ class AssociativeMemory(object):
             column = self._relation[:,j]
             sum = np.sum(column)
             if sum == 0:
-                self._iota_relation[:,j] = np.zeros(self._m, dtype=int)
+                self._iota_relation[:,j] = np.zeros(self._m, dtype='int16')
             else:
                 count = np.count_nonzero(column)
                 mean = self.iota*sum/count
@@ -196,7 +196,7 @@ class AssociativeMemory(object):
         return value == self.undefined
 
     def vector_to_relation(self, vector):
-        relation = np.zeros((self._m, self._n), np.bool)
+        relation = np.zeros((self._m, self._n), bool)
         relation[vector, range(self.n)] = True
         return relation
 

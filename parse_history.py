@@ -11,10 +11,14 @@ def print_keys(data):
     print(']')
 
 if __name__ == "__main__":
-    prefix = 'runs-'
     suffix = '/model-classifier.json'
+
     for domain in domain_sizes:
-        filename = f'{prefix}{domain}{suffix}'
+        class_values = []
+        autor_values = []
+
+        filename = f'runs-{domain}{suffix}'
+        
         # Opening JSON file
         with open(filename, 'r') as f:
             data = json.load(f)
@@ -23,8 +27,16 @@ if __name__ == "__main__":
             # and it is ignored. The second and third elements contain
             # the metric and loss for the classifier and autoencoder,
             # respectively
-            print(f'History lenght: {len(history)}')
             for i in range(0, len(history), 3):
-                class_value = history[i+1][class_metric]
-                autor_value = history[i+2][autor_metric]
-                print(f'{domain},{class_value},{autor_value}')
+                class_values.append(history[i+1][class_metric])
+                autor_values.append(history[i+2][autor_metric])
+
+        print(f'Domain size: {domain}. Metric outputs are presented next.')
+        print(f'Fold\tClassification\tAutoencoder')
+        for j in range(len(class_values)):
+            print(f'{j}\t{class_values[j]:.3f}\t\t{autor_values[j]:.3f}')
+
+        class_value_mean = sum(class_values) / len(class_values)
+        autor_value_mean = sum(autor_values) / len(autor_values)
+        print(f'\nMean accuracy value: {class_value_mean:.4f}, mean rmse value: {autor_value_mean:.4f}')
+        print('\n')

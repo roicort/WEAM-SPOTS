@@ -122,7 +122,7 @@ n_behaviours = 7
 
 memory_sizes = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 memory_fills = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 100.0]
-sigma_values = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
+sigma_values = [0.05, 0.1, 0.15, 0.3, 0.4, 0.5]
 n_best_memory_sizes = 3
 n_samples = 10
 learned_data_groups = 6
@@ -302,8 +302,13 @@ def picture_filename(name_prefix, es, fold = None):
     return filename(name_prefix, es, fold, extension='.svg')
 
 def image_filename(prefix, idx, label, suffix = '', es = None, fold = None):
-    name_prefix = image_path + '/' + prefix + '/' + \
-        str(label).zfill(3) + '_' + str(idx).zfill(5)  + suffix
+    img_dir = image_path + '/' + prefix + '/'
+    try:
+        os.makedirs(run_path + '/' + img_dir)
+    except FileExistsError:
+        pass
+
+    name_prefix = img_dir + str(label).zfill(1) + '_' + str(idx).zfill(5)  + suffix
     return filename(name_prefix, es, fold, extension='.png')
 
 def learned_data_filename(suffix, es, fold):
