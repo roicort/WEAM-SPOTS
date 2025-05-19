@@ -18,12 +18,13 @@ from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Flatten, \
     Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D, \
     UpSampling2D
-from tensorflow.keras.layers.experimental.preprocessing import Rescaling
+from tensorflow.keras.layers import Rescaling
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback
 from joblib import Parallel, delayed
 import constants
 import dataset
+from tqdm import tqdm
 
 batch_size = 32
 epochs = 300
@@ -198,20 +199,20 @@ def train_network(prefix, es):
         classifier = Model(input_cla, classified, name='classifier')
         classifier.compile(
             loss = 'categorical_crossentropy', optimizer = 'adam',
-            metrics = 'accuracy')
+            metrics = ['accuracy'])
         classifier.summary()
         input_dec, decoded = get_decoder()
         decoder = Model(input_dec, decoded, name='decoder')
         decoder.compile(
-            optimizer = 'adam', loss = 'mean_squared_error', metrics = rmse)
+            optimizer = 'adam', loss = 'mean_squared_error', metrics = [rmse])
         decoder.summary()
         encoded = encoder(input_data)
         decoded = decoder(encoded)
         classified = classifier(encoded)
         full_classifier = Model(inputs=input_data, outputs=classified, name='full_classifier')
-        full_classifier.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = 'accuracy') 
+        full_classifier.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = ['accuracy'])
         autoencoder = Model(inputs = input_data, outputs=decoded, name='autoencoder')
-        autoencoder.compile(loss='huber', optimizer='adam', metrics=rmse)
+        autoencoder.compile(loss='huber', optimizer='adam', metrics=[rmse])
 
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],

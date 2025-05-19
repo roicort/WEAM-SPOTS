@@ -53,6 +53,19 @@ import sys
 sys.setrecursionlimit(10000)
 
 
+import tensorflow as tf
+
+devices = tf.config.list_physical_devices()
+print("\nDevices: ", devices)
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    details = tf.config.experimental.get_device_details(gpus[0])
+    print("GPU details: ", details)
+else:
+    print("No GPU found.")
+
+
 # A trick to avoid getting a lot of errors at edition time because of
 # undefined '_' gettext function.
 if typing.TYPE_CHECKING:
@@ -60,7 +73,7 @@ if typing.TYPE_CHECKING:
         pass
 
 # Translation
-gettext.install('eam', localedir=None, codeset=None, names=None)
+gettext.install('eam', localedir=None, names=None)
 
 
 def plot_pre_graph(pre_mean, rec_mean, ent_mean, pre_std, rec_std,
@@ -383,6 +396,7 @@ def test_memory_sizes(domain, es):
     for fold in range(constants.n_folds):
         gc.collect()
         filename = constants.classifier_filename(model_prefix, es, fold)
+        print(f'Loading classifier from {filename}')
         classifier = tf.keras.models.load_model(filename)
         print(f'Fold: {fold}')
         suffix = constants.filling_suffix
