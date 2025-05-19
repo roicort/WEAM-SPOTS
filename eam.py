@@ -919,6 +919,9 @@ def store_dream(dream, label, index, suffix, es, fold):
 
 def store_image(filename, array):
     pixels = array.reshape(dataset.columns, dataset.rows)
+    # Si el rango de la imagen esta normalizada entre 0 y 1 se multiplica por 255
+    if pixels.max() <= 1.1:
+        pixels = pixels * 255.0
     pixels = pixels.round().astype(np.uint8)
     png.from_array(pixels, 'L;8').save(filename)
 

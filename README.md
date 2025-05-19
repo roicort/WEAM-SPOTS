@@ -4,10 +4,24 @@ This repository contains the procedures to replicate the experiments presented i
 
 Pineda, Luis A. & Rafael Morales (under review). _Imagery in the Entropic Associative Memory_.
 
-The code was written in Python 3, using the Anaconda Distribution, and was run on a desktop computer with the following specifications:
-* CPU: Intel Core i7-6700 at 3.40 GHz
-* GPU: Nvidia GeForce GTX 1080
-* OS: Ubuntu 16.04 Xenial
-* RAM: 64GB
+## Dataset SPOTS-10
 
+El dataset SPOTS-10 contiene imágenes clasificadas en 10 categorías animales:
+
+| ID | Categoría      |
+|----|---------------|
+| 0  | Cheetah       |
+| 1  | Deer          |
+| 2  | Giraffe       |
+| 3  | Hyena         |
+| 4  | Jaguar        |
+| 5  | Leopard       |
+| 6  | Tapir Calf    |
+| 7  | Tiger         |
+| 8  | Whale Shark   |
+| 9  | Zebra         |
+
+Para más detalles, consulta [SPOTS/README.md](SPOTS/README.md).
+
+## Uso 
 

@@ -6,5 +6,5 @@ class SPOTS:
 
     def load_data(self, kind="train"):
         X, y = SPOT10Loader.get_data(dataset_dir=self.dataset_dir, kind=kind)
-        X = X.astype('float32') / 255.0
+        X = X.astype('float32') / 255.0  # Normalize the images to [0, 1]
         return X, y

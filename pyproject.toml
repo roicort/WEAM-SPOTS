@@ -1,0 +1,21 @@
+[project]
+name = "weam-spots"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "docopt",
+    "pypng",
+    "seaborn",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "protobuf",
+    "h5py",
+    "tensorflow; sys_platform == 'darwin'",
+    "tensorflow-metal; sys_platform == 'darwin'",
+    "tensorflow[and-cuda]; sys_platform == 'linux'",
+    "tqdm",
+    "joblib",
+]
