@@ -15,14 +15,13 @@
 
 import csv
 import os
-# os.environ['CUDA_VISIBLE_DEVICES']='0'
 import re
 from signal import Sigmasks
 import sys
 import numpy as np
 
 # Directory where all results are stored.
-data_path = 'data/fashion'
+data_path = './SPOTS'
 run_path = 'runs'
 idx_digits = 3
 prep_data_fname = 'prep_data.npy'
@@ -326,16 +325,16 @@ def seed_labels_filename():
     return data_filename(learning_data_seed + labels_suffix)
 
 def model_filename(name_prefix, es, fold):
-    return filename(name_prefix, es, fold)
+    return filename(name_prefix, es, fold, extension='.keras')
 
 def encoder_filename(name_prefix, es, fold):
-    return filename(name_prefix + encoder_suffix, es, fold)
+    return filename(name_prefix + encoder_suffix, es, fold, extension='.keras')
 
 def classifier_filename(name_prefix, es, fold):
-    return filename(name_prefix + classifier_suffix, es, fold)
+    return filename(name_prefix + classifier_suffix, es, fold, extension='.keras')
 
 def decoder_filename(name_prefix, es, fold):
-    return filename(name_prefix + decoder_suffix, es, fold)
+    return filename(name_prefix + decoder_suffix, es, fold, extension='.keras')
 
 def memory_confrix_filename(fill, es, fold):
     prefix = mem_conf_prefix + int_suffix(fill, 'fll')

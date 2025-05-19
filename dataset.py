@@ -18,10 +18,15 @@ import os
 import random
 import constants
 
+#### SPOTS ########################################
 
-# This code is an abstraction for the MNIST Fashion dataset,
-columns = 28
-rows = 28
+from SPOTS.customloader import SPOTS
+
+###################################################
+
+# This code is an abstraction for the SPOTS dataset,
+columns = 32
+rows = 32
 
 def get_training(fold):
     return _get_segment(_TRAINING_SEGMENT, fold)
@@ -98,11 +103,26 @@ _TRAINING_SEGMENT = 0
 _FILLING_SEGMENT = 1
 _TESTING_SEGMENT = 2
 
+"""
 def _load_dataset(path):
     data, noised_data, labels = _preprocessed_dataset(path)
     if (data is None) or (noised_data is None) or (labels is None):
         data_train, labels_train = _load_mnist(path, kind='train')
         data_test, labels_test = _load_mnist(path, kind='t10k')
+        data = np.concatenate((data_train, data_test), axis=0).astype(dtype=float)
+        noised_data = noised(data, constants.noise_percent)
+        labels = np.concatenate((labels_train, labels_test), axis=0)
+        data, noised_data, labels = _shuffle(data, noised_data, labels)
+        _save_dataset(data, noised_data, labels, path)
+    return data, noised_data, labels
+"""
+
+def _load_dataset(path):
+    data, noised_data, labels = _preprocessed_dataset(path)
+    if (data is None) or (noised_data is None) or (labels is None):
+        spots = SPOTS()
+        data_train, labels_train = spots.load_data(kind='train')
+        data_test, labels_test = spots.load_data(kind='test')
         data = np.concatenate((data_train, data_test), axis=0).astype(dtype=float)
         noised_data = noised(data, constants.noise_percent)
         labels = np.concatenate((labels_train, labels_test), axis=0)
@@ -127,7 +147,7 @@ def _preprocessed_dataset(path):
     return data, noised, labels
 
 def _save_dataset(data, noised, labels, path):
-    print('Saving preprocessed dataset')
+    print(f'Saving preprocessed dataset in {path}.')
     data_fname = os.path.join(path, constants.prep_data_fname)
     noised_fname = os.path.join(path, constants.pred_noised_data_fname)
     labels_fname = os.path.join(path, constants.prep_labels_fname)
@@ -135,18 +155,6 @@ def _save_dataset(data, noised, labels, path):
     np.save(noised_fname, noised)
     np.save(labels_fname, labels)
 
-def _load_mnist(path, kind='train'):
-    """Load MNIST data from `path`"""
-    labels_path = os.path.join(path, '%s-labels-idx1-ubyte.gz' % kind)
-    images_path = os.path.join(path, '%s-images-idx3-ubyte.gz' % kind)
-
-    with gzip.open(labels_path, 'rb') as lbpath:
-        labels = np.frombuffer(lbpath.read(),
-            dtype=np.uint8, offset=8)
-    with gzip.open(images_path, 'rb') as imgpath:
-        images = np.frombuffer(imgpath.read(),
-            dtype=np.uint8, offset=16).reshape(len(labels), 28, 28)
-    return images, labels
 
 def _shuffle(data, noised, labels):
     print('Shuffling data and labels')
