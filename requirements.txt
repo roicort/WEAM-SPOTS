@@ -1,9 +1,0 @@
-docopt
-pypng
-seaborn
-tensorflow==2.19.0
-numpy
-pandas
-matplotlib
-protobuf
-h5py
