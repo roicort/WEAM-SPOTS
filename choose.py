@@ -43,4 +43,5 @@ for fold in range(constants.n_folds):
 prefix = constants.chosen_prefix
 fname = constants.csv_filename(prefix, es)
 np.savetxt(fname, chosen, fmt='%d', delimiter=',')
+print(f'Chosen samples saved in {fname}')
 

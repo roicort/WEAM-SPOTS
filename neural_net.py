@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+###########################################################################
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model
@@ -24,9 +26,19 @@ from tensorflow.keras.callbacks import Callback
 from joblib import Parallel, delayed
 import constants
 import dataset
-from tqdm import tqdm
 
-batch_size = 32
+
+from tqdm import tqdm
+from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn, TimeRemainingColumn
+from rich.table import Table
+import matplotlib.pyplot as plt
+import os
+
+###########################################################################
+
+# Constants for the training process.
+
+batch_size = 64
 epochs = 300
 patience = 7
 truly_training_percentage = 0.80
@@ -225,7 +237,8 @@ def train_network(prefix, es):
                 epochs=epochs,
                 validation_data= (validation_data,
                     {'classifier': validation_labels, 'decoder': validation_data}),
-                callbacks=[EarlyStopping()],
+                callbacks=[EarlyStopping(),
+                    ProgressBar(epochs), ReconstructionsSaver(autoencoder, validation_data)],
                 verbose=2)
         histories.append(history)
         history = full_classifier.evaluate(testing_data, testing_labels, return_dict=True)
@@ -278,3 +291,97 @@ def obtain_features(model_prefix, features_prefix, labels_prefix, data_prefix, e
             features = model.predict(data)
             np.save(features_filename, features)
             np.save(labels_filename, labels)
+
+
+########################################################################################
+
+class ProgressBar(Callback):
+    def __init__(self, total_epochs):
+        super().__init__()
+        self.total_epochs = total_epochs
+        self.progress = Progress(
+            SpinnerColumn(), *Progress.get_default_columns(), "Elapsed:", TimeElapsedColumn(), TimeRemainingColumn()
+        )
+        self.task_id = None
+
+    def on_train_begin(self, logs=None):
+        self.progress.start()
+        self.task_id = self.progress.add_task("Entrenando...", total=self.total_epochs)
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.progress.update(self.task_id, advance=1)
+        # Extrae todas las métricas relevantes
+        acc = logs.get('classifier_accuracy', 0)
+        loss = logs.get('classifier_loss', 0)
+        dec_loss = logs.get('decoder_loss', 0)
+        dec_rmse = logs.get('decoder_root_mean_squared_error', 0)
+        total_loss = logs.get('loss', 0)
+        val_acc = logs.get('val_classifier_accuracy', 0)
+        val_loss = logs.get('val_classifier_loss', 0)
+        val_dec_loss = logs.get('val_decoder_loss', 0)
+        val_dec_rmse = logs.get('val_decoder_root_mean_squared_error', 0)
+        val_total_loss = logs.get('val_loss', 0)
+
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Epoch", justify="right")
+        table.add_column("acc")
+        table.add_column("loss")
+        table.add_column("dec_loss")
+        table.add_column("dec_rmse")
+        table.add_column("total_loss")
+        table.add_column("val_acc")
+        table.add_column("val_loss")
+        table.add_column("val_dec_loss")
+        table.add_column("val_dec_rmse")
+        table.add_column("val_total_loss")
+
+        table.add_row(
+            f"{epoch+1}/{self.total_epochs}",
+            f"{acc:.4f}",
+            f"{loss:.4f}",
+            f"{dec_loss:.4f}",
+            f"{dec_rmse:.4f}",
+            f"{total_loss:.4f}",
+            f"{val_acc:.4f}",
+            f"{val_loss:.4f}",
+            f"{val_dec_loss:.4f}",
+            f"{val_dec_rmse:.4f}",
+            f"{val_total_loss:.4f}",
+        )
+        self.progress.console.print(table)
+
+    def on_train_end(self, logs=None):
+        self.progress.stop()
+
+def save_reconstructions(autoencoder, data, epoch, output_dir="reconstructions"):
+    os.makedirs(output_dir, exist_ok=True)
+    decoded_imgs = autoencoder.predict(data[:10])
+    n = 10
+    plt.figure(figsize=(20, 4))
+    for i in range(n):
+        # Imagen original
+        ax = plt.subplot(2, n, i + 1)
+        img_orig = (data[i].reshape(data.shape[1], data.shape[2]) * 255).astype(np.uint8)
+        plt.imshow(img_orig, cmap="gray")
+        plt.title("Original")
+        plt.axis("off")
+        # Imagen reconstruida
+        ax = plt.subplot(2, n, i + 1 + n)
+        img_recon = (decoded_imgs[i].reshape(data.shape[1], data.shape[2]) * 255).astype(np.uint8)
+        plt.imshow(img_recon, cmap="gray")
+        plt.title("Reconstruida")
+        plt.axis("off")
+    plt.savefig(os.path.join(output_dir, f"recon_epoch_{epoch}.png"))
+    plt.close()
+
+class ReconstructionsSaver(Callback):
+    def __init__(self, autoencoder, data, output_dir="reconstructions", every_n_epochs=10):
+        super().__init__()
+        self.autoencoder = autoencoder
+        self.data = data
+        self.output_dir = output_dir
+        self.every_n_epochs = every_n_epochs
+
+    def on_epoch_end(self, epoch, logs=None):
+        if (epoch + 1) % self.every_n_epochs == 0:
+            save_reconstructions(self.autoencoder, self.data, epoch + 1, self.output_dir)
