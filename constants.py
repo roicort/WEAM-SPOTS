@@ -84,8 +84,8 @@ learning_suffixes = [[original_suffix], [agreed_suffix], [amsystem_suffix],
 
 # Number of columns in memory
 domain = 256
-n_folds = 10
-n_jobs = 1
+n_folds = 5
+n_jobs = -1
 dreaming_cycles = 6
 
 iota_default = 0.0
@@ -122,7 +122,7 @@ n_behaviours = 7
 memory_sizes = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 memory_fills = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 100.0]
 sigma_values = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
-n_best_memory_sizes = 3
+n_best_memory_sizes = 2
 n_samples = 10
 learned_data_groups = 6
 
