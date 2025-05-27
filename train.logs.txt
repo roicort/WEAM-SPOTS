@@ -1,0 +1,39 @@
+========== TRAINING STARTED: Sat May 24 05:58:40 UTC 2025 ==========
+
+----- Domain size: 32 -----
+    [Sat May 24 06:14:23 UTC 2025] Step -n completed. Time: 943 seconds.
+    [Sat May 24 06:15:17 UTC 2025] Step -f completed. Time: 54 seconds.
+    [Sat May 24 06:38:26 UTC 2025] Step -e completed. Time: 1389 seconds.
+    [Sat May 24 06:38:26 UTC 2025] Training for domain 32 completed.
+------------------------------
+
+----- Domain size: 64 -----
+    [Sat May 24 07:00:19 UTC 2025] Step -n completed. Time: 1313 seconds.
+    [Sat May 24 07:01:14 UTC 2025] Step -f completed. Time: 55 seconds.
+    [Sat May 24 07:51:58 UTC 2025] Step -e completed. Time: 3044 seconds.
+    [Sat May 24 07:51:58 UTC 2025] Training for domain 64 completed.
+------------------------------
+
+----- Domain size: 128 -----
+    [Sat May 24 08:38:36 UTC 2025] Step -n completed. Time: 2798 seconds.
+    [Sat May 24 08:39:31 UTC 2025] Step -f completed. Time: 55 seconds.
+    [Sat May 24 10:34:11 UTC 2025] Step -e completed. Time: 6880 seconds.
+    [Sat May 24 10:34:11 UTC 2025] Training for domain 128 completed.
+------------------------------
+
+----- Domain size: 256 -----
+    [Mon May 26 21:06:44 UTC 2025] Step -n completed. Time: 6446 seconds.
+    [Mon May 26 21:07:41 UTC 2025] Step -f completed. Time: 57 seconds.
+    [Tue May 27 00:06:13 UTC 2025] Step -e completed. Time: 10712 seconds.
+    [Tue May 27 00:06:13 UTC 2025] Training for domain 256 completed.
+------------------------------
+
+----- Domain size: 512 -----
+    [Tue May 27 00:32:50 UTC 2025] Step -n completed. Time: 1597 seconds.
+    [Tue May 27 00:33:50 UTC 2025] Step -f completed. Time: 60 seconds.
+    [Tue May 27 05:57:35 UTC 2025] Step -e completed. Time: 19425 seconds.
+    [Tue May 27 05:57:35 UTC 2025] Training for domain 512 completed.
+------------------------------
+
+========== TRAINING FINISHED: Sat May 24 20:06:08 UTC 2025 ==========
+Total training time: 21295 seconds.
