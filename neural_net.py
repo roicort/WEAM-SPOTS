@@ -20,7 +20,6 @@ from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Flatten, \
     Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D, \
     UpSampling2D
-from tensorflow.keras.layers import Rescaling
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback
 from joblib import Parallel, delayed
@@ -231,7 +230,7 @@ def train_network(prefix, es):
                 validation_data= (validation_data,
                     {'classifier': validation_labels, 'decoder': validation_data}),
                 callbacks=[EarlyStopping(),
-                    ProgressBar(epochs), ReconstructionsSaver(autoencoder, validation_data)],
+                    ProgressBar(epochs), ReconstructionsSaver(autoencoder, validation_data, constants.domain)],
                 verbose=0)
         histories.append(history)
         history = full_classifier.evaluate(testing_data, testing_labels, return_dict=True)
@@ -346,7 +345,7 @@ class ProgressBar(Callback):
     def on_train_end(self, logs=None):
         self.progress.stop()
 
-def save_reconstructions(autoencoder, data, epoch, output_dir="reconstructions"):
+def save_reconstructions(autoencoder, data, domain, epoch, output_dir="reconstructions"):
     os.makedirs(output_dir, exist_ok=True)
     decoded_imgs = autoencoder.predict(data[:10])
     n = 10
@@ -364,17 +363,18 @@ def save_reconstructions(autoencoder, data, epoch, output_dir="reconstructions")
         plt.imshow(img_recon, cmap="gray")
         plt.title("Reconstruida")
         plt.axis("off")
-    plt.savefig(os.path.join(output_dir, f"recon_epoch_{epoch}.png"))
+    plt.savefig(os.path.join(output_dir, f"{domain}_epoch_{epoch}.png"))
     plt.close()
 
 class ReconstructionsSaver(Callback):
-    def __init__(self, autoencoder, data, output_dir="reconstructions", every_n_epochs=10):
+    def __init__(self, autoencoder, data, domain, output_dir="decoded", every_n_epochs=10):
         super().__init__()
         self.autoencoder = autoencoder
         self.data = data
+        self.domain = domain
         self.output_dir = output_dir
         self.every_n_epochs = every_n_epochs
 
     def on_epoch_end(self, epoch, logs=None):
         if (epoch + 1) % self.every_n_epochs == 0:
-            save_reconstructions(self.autoencoder, self.data, epoch + 1, self.output_dir)
+            save_reconstructions(self.autoencoder, self.data, self.domain, epoch + 1, self.output_dir)
