@@ -21,12 +21,13 @@ from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Fl
     Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D, \
     UpSampling2D, LeakyReLU
 from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.callbacks import Callback, TensorBoard
+import datetime
 from joblib import Parallel, delayed
 import constants
 import dataset
 from tensorflow.keras.regularizers import l2
-
+from tensorflow.keras.optimizers import AdamW
 
 from tqdm import tqdm
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn, TimeRemainingColumn
@@ -118,17 +119,16 @@ def get_decoder():
 
 def get_classifier():
     input_mem = Input(shape=(constants.domain, ))
-    dense = Dense(constants.domain, kernel_regularizer=l2(1e-4))(input_mem)
+    dense = Dense(constants.domain)(input_mem)
     dense = LeakyReLU(negative_slope=0.1)(dense)
-    drop = Dropout(0.4)(dense)
-    dense = Dense(constants.domain, kernel_regularizer=l2(1e-4))(drop)
+    drop = Dropout(0.2)(dense)
+    dense = Dense(constants.domain)(drop)
     dense = LeakyReLU(negative_slope=0.1)(dense)
-    drop = Dropout(0.4)(dense)
+    drop = Dropout(0.2)(dense)
     classification = Dense(
         constants.n_labels,
         activation='softmax',
-        name='classified',
-        kernel_regularizer=l2(1e-4)
+        name='classified'
     )(drop)
     return input_mem, classification
 
@@ -241,18 +241,25 @@ def train_network(prefix, es):
 
         model = Model(inputs=input_data, outputs=[classified, decoded])
         model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
-                    optimizer='adam',
-                    metrics={'classifier': 'accuracy', 'decoder': rmse})
+                    optimizer=AdamW(learning_rate=0.002, weight_decay=1e-4),
+                    metrics={'classifier': 'accuracy', 'decoder': tf.keras.metrics.RootMeanSquaredError()})
         model.summary()
-        history = model.fit(training_data,
-                (training_labels, training_data),
-                batch_size=batch_size,
-                epochs=epochs,
-                validation_data= (validation_data,
-                    {'classifier': validation_labels, 'decoder': validation_data}),
-                callbacks=[EarlyStopping(),
-                    ProgressBar(epochs), ReconstructionsSaver(autoencoder, validation_data, constants.domain)],
-                verbose=0)
+        log_dir = f"logs/tensorboard/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-fold{fold}"
+        tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+        history = model.fit(
+            training_data,
+            (training_labels, training_data),
+            batch_size=batch_size,
+            epochs=epochs,
+            validation_data=(validation_data, {'classifier': validation_labels, 'decoder': validation_data}),
+            callbacks=[
+                EarlyStopping(),
+                ProgressBar(epochs),
+                ReconstructionsSaver(autoencoder, validation_data, constants.domain),
+                tensorboard_callback 
+            ],
+            verbose=0
+        )
         histories.append(history)
         history = full_classifier.evaluate(testing_data, testing_labels, return_dict=True)
         histories.append(history)

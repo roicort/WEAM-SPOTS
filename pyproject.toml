@@ -18,4 +18,5 @@ dependencies = [
     "tensorflow[and-cuda]; sys_platform == 'linux'",
     "tqdm",
     "joblib",
+    "tensorboard>=2.19.0",
 ]
