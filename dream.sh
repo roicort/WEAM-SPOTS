@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LOGFILE="dream.logs.txt"
+LOGFILE="logs/dream.logs.txt"
 n=256
 
 echo "========== RUN RD STARTED: $(date) ==========" > $LOGFILE

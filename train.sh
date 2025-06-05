@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LOGFILE="train.logs.txt"
+LOGFILE="logs/train.logs.txt"
 
 echo "========== TRAINING STARTED: $(date) ==========" > $LOGFILE
 

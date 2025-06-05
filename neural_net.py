@@ -58,9 +58,6 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
     drop = SpatialDropout2D(0.4)(pool)
     return drop
 
-# The number of layers defined in get_encoder.
-encoder_nlayers = 40
-
 def get_encoder():
     dropout = 0.1
     input_data = Input(shape=(dataset.columns, dataset.rows, 1))
@@ -104,9 +101,6 @@ def get_decoder():
         output = BatchNormalization()(output)
     output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
     return input_mem, output
-
-# The number of layers defined in get_classifier.
-classifier_nlayers = 6
 
 def get_classifier():
     input_mem = Input(shape=(constants.domain, ))
@@ -240,7 +234,7 @@ def train_network(prefix, es):
                     {'classifier': validation_labels, 'decoder': validation_data}),
                 callbacks=[EarlyStopping(),
                     ProgressBar(epochs), ReconstructionsSaver(autoencoder, validation_data)],
-                verbose=2)
+                verbose=0)
         histories.append(history)
         history = full_classifier.evaluate(testing_data, testing_labels, return_dict=True)
         histories.append(history)
@@ -301,7 +295,7 @@ class ProgressBar(Callback):
         super().__init__()
         self.total_epochs = total_epochs
         self.progress = Progress(
-            SpinnerColumn(), *Progress.get_default_columns(), "Elapsed:", TimeElapsedColumn(), TimeRemainingColumn()
+            SpinnerColumn(), *Progress.get_default_columns(), TimeElapsedColumn()
         )
         self.task_id = None
 
