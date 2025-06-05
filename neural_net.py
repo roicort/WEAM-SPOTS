@@ -64,6 +64,8 @@ encoder_nlayers = 40
 def get_encoder():
     dropout = 0.1
     input_data = Input(shape=(dataset.columns, dataset.rows, 1))
+    # Las imagenes son normalizadas a [0, 1] para evitar problemas de convergencia.
+    input_data = Rescaling(1./255)(input_data) 
     filters = constants.domain // 16
     output = conv_block(input_data, 2, filters, dropout, first_block=True)
     filters *= 2
@@ -101,8 +103,7 @@ def get_decoder():
         filters = filters // 2 
         output = BatchNormalization()(output)
     output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
-    output_img = Rescaling(255.0, name='decoded')(output)
-    return input_mem, output_img
+    return input_mem, output
 
 # The number of layers defined in get_classifier.
 classifier_nlayers = 6
