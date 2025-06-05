@@ -73,18 +73,13 @@ def get_encoder():
     output = conv_block(input_data, 2, filters, dropout, first_block=True)
     filters *= 2
     dropout += 0.2
-    output = conv_block(output, 2, filters, dropout)
-    filters *= 2
-    dropout += 0.2
-    output = conv_block(output, 3, filters, dropout)
-    filters *= 2
-    dropout += 0.2
     output = conv_block(output, 3, filters, dropout)
     filters *= 2
     dropout += 0.25
     output = conv_block(output, 3, filters, dropout)
     output = Flatten()(output)
-    output = LayerNormalization(name = 'encoded')(output)
+    output = Dense(constants.domain, activation='linear')(output)  # <-- Añade esta línea
+    output = LayerNormalization(name='encoded')(output)
     return input_data, output
 
 def get_decoder():
@@ -119,12 +114,12 @@ def get_decoder():
 
 def get_classifier():
     input_mem = Input(shape=(constants.domain, ))
-    dense = Dense(constants.domain)(input_mem)
-    dense = LeakyReLU(negative_slope=0.1)(dense)
-    drop = Dropout(0.2)(dense)
-    dense = Dense(constants.domain)(drop)
-    dense = LeakyReLU(negative_slope=0.1)(dense)
-    drop = Dropout(0.2)(dense)
+    dense = Dense(
+        constants.domain, activation='relu',
+        input_shape=(constants.domain, ))(input_mem)
+    drop = Dropout(0.4)(dense)
+    dense = Dense(constants.domain, activation='relu')(drop)
+    drop = Dropout(0.4)(dense)
     classification = Dense(
         constants.n_labels,
         activation='softmax',
