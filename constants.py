@@ -84,7 +84,7 @@ learning_suffixes = [[original_suffix], [agreed_suffix], [amsystem_suffix],
 
 # Number of columns in memory
 domain = 256
-n_folds = 5
+n_folds = 1
 n_jobs = -1
 dreaming_cycles = 6
 
