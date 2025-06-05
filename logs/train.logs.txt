@@ -1,0 +1,39 @@
+========== TRAINING STARTED: jueves,  5 de junio de 2025, 00:08:12 CST ==========
+
+----- Domain size: 32 -----
+    [jueves,  5 de junio de 2025, 00:25:44 CST] Step -n completed. Time: 1052 seconds.
+    [jueves,  5 de junio de 2025, 00:25:54 CST] Step -f completed. Time: 10 seconds.
+    [jueves,  5 de junio de 2025, 00:27:27 CST] Step -e completed. Time: 93 seconds.
+    [jueves,  5 de junio de 2025, 00:27:27 CST] Training for domain 32 completed.
+------------------------------
+
+----- Domain size: 64 -----
+    [jueves,  5 de junio de 2025, 00:45:43 CST] Step -n completed. Time: 1096 seconds.
+    [jueves,  5 de junio de 2025, 00:45:53 CST] Step -f completed. Time: 10 seconds.
+    [jueves,  5 de junio de 2025, 00:48:54 CST] Step -e completed. Time: 181 seconds.
+    [jueves,  5 de junio de 2025, 00:48:54 CST] Training for domain 64 completed.
+------------------------------
+
+----- Domain size: 128 -----
+    [jueves,  5 de junio de 2025, 01:08:56 CST] Step -n completed. Time: 1202 seconds.
+    [jueves,  5 de junio de 2025, 01:09:06 CST] Step -f completed. Time: 10 seconds.
+    [jueves,  5 de junio de 2025, 01:15:20 CST] Step -e completed. Time: 374 seconds.
+    [jueves,  5 de junio de 2025, 01:15:20 CST] Training for domain 128 completed.
+------------------------------
+
+----- Domain size: 256 -----
+    [jueves,  5 de junio de 2025, 04:01:51 CST] Step -n completed. Time: 9991 seconds.
+    [jueves,  5 de junio de 2025, 04:02:03 CST] Step -f completed. Time: 12 seconds.
+    [jueves,  5 de junio de 2025, 04:13:27 CST] Step -e completed. Time: 684 seconds.
+    [jueves,  5 de junio de 2025, 04:13:27 CST] Training for domain 256 completed.
+------------------------------
+
+----- Domain size: 512 -----
+    [jueves,  5 de junio de 2025, 05:41:07 CST] Step -n completed. Time: 5260 seconds.
+    [jueves,  5 de junio de 2025, 05:41:20 CST] Step -f completed. Time: 13 seconds.
+    [jueves,  5 de junio de 2025, 06:02:41 CST] Step -e completed. Time: 1281 seconds.
+    [jueves,  5 de junio de 2025, 06:02:41 CST] Training for domain 512 completed.
+------------------------------
+
+========== TRAINING FINISHED: jueves,  5 de junio de 2025, 06:02:41 CST ==========
+Total training time: 6554 seconds.
