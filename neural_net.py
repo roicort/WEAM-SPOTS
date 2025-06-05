@@ -19,12 +19,13 @@ import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Flatten, \
     Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D, \
-    UpSampling2D
+    UpSampling2D, LeakyReLU
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback
 from joblib import Parallel, delayed
 import constants
 import dataset
+from tensorflow.keras.regularizers import l2
 
 
 from tqdm import tqdm
@@ -46,14 +47,21 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
     conv = None
     for i in range(layers):
         if first_block:
-            conv = Conv2D(kernel_size =3, padding ='same', activation='relu', 
-                filters = filters, input_shape = (dataset.columns, dataset.rows, 1))(entry)
+            conv = Conv2D(
+                kernel_size=3, padding='same', filters=filters,
+                kernel_regularizer=l2(1e-4),
+            )(entry)
+            conv = LeakyReLU(negative_slope=0.1)(conv)
             first_block = False
         else:
-            conv = Conv2D(kernel_size =3, padding ='same', activation='relu', 
-                filters = filters)(entry)
+            conv = Conv2D(
+                kernel_size=3, padding='same', filters=filters,
+                kernel_regularizer=l2(1e-4)
+            )(entry)
+            conv = LeakyReLU(negative_slope=0.1)(conv)
         entry = BatchNormalization()(conv)
-    pool = MaxPool2D(pool_size = 3, strides =2, padding ='same')(entry)
+        entry = Dropout(dropout)(entry)
+    pool = MaxPool2D(pool_size=3, strides=2, padding='same')(entry)
     drop = SpatialDropout2D(0.4)(pool)
     return drop
 
@@ -63,16 +71,16 @@ def get_encoder():
     filters = constants.domain // 16
     output = conv_block(input_data, 2, filters, dropout, first_block=True)
     filters *= 2
-    dropout += 0.7
+    dropout += 0.2
     output = conv_block(output, 2, filters, dropout)
     filters *= 2
-    dropout += 0.7
+    dropout += 0.2
     output = conv_block(output, 3, filters, dropout)
     filters *= 2
-    dropout += 0.7
+    dropout += 0.2
     output = conv_block(output, 3, filters, dropout)
     filters *= 2
-    dropout += 0.9
+    dropout += 0.25
     output = conv_block(output, 3, filters, dropout)
     output = Flatten()(output)
     output = LayerNormalization(name = 'encoded')(output)
@@ -82,33 +90,46 @@ def get_decoder():
     input_mem = Input(shape=(constants.domain, ))
     width = dataset.columns // 4
     filters = constants.domain // 2
-    dense = Dense(
-        width*width*filters, activation = 'relu',
-        input_shape=(constants.domain, ) )(input_mem)
-    output = Reshape((width, width, filters))(dense)
-    filters *= 2
+    dense = Dense(width*width*filters, activation=None, kernel_regularizer=l2(1e-4))(input_mem)
+    output = LeakyReLU(negative_slope=0.1)(dense)
+    output = Reshape((width, width, filters))(output)
     dropout = 0.4
-    for i in range(2):
-        trans = Conv2D(kernel_size=3, strides=1,padding='same', activation='relu',
-            filters= filters)(output)
-        pool = UpSampling2D(size=2)(trans)
-        output = SpatialDropout2D(dropout)(pool)
-        dropout /= 2.0
-        filters = filters // 2 
-        output = BatchNormalization()(output)
-    output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
+
+    # Primer bloque de upsampling
+    output = Conv2DTranspose(filters=filters, kernel_size=3, strides=2, padding='same',
+                             kernel_regularizer=l2(1e-4))(output)
+    output = LeakyReLU(negative_slope=0.1)(output)
+    output = BatchNormalization()(output)
+    output = SpatialDropout2D(dropout)(output)
+    filters = filters // 2
+    dropout /= 2.0
+
+    # Segundo bloque de upsampling
+    output = Conv2DTranspose(filters=filters, kernel_size=3, strides=2, padding='same',
+                             kernel_regularizer=l2(1e-4))(output)
+    output = LeakyReLU(negative_slope=0.1)(output)
+    output = BatchNormalization()(output)
+    output = SpatialDropout2D(dropout)(output)
+
+    # Capa final para reconstrucción
+    output = Conv2D(filters=1, kernel_size=3, activation='sigmoid', padding='same',
+                    kernel_regularizer=l2(1e-4))(output)
     return input_mem, output
 
 def get_classifier():
     input_mem = Input(shape=(constants.domain, ))
-    dense = Dense(
-        constants.domain, activation='relu',
-        input_shape=(constants.domain, ))(input_mem)
+    dense = Dense(constants.domain, kernel_regularizer=l2(1e-4))(input_mem)
+    dense = LeakyReLU(negative_slope=0.1)(dense)
     drop = Dropout(0.4)(dense)
-    dense = Dense(constants.domain, activation='relu')(drop)
+    dense = Dense(constants.domain, kernel_regularizer=l2(1e-4))(drop)
+    dense = LeakyReLU(negative_slope=0.1)(dense)
     drop = Dropout(0.4)(dense)
-    classification = Dense(constants.n_labels,
-        activation='softmax', name='classified')(drop)
+    classification = Dense(
+        constants.n_labels,
+        activation='softmax',
+        name='classified',
+        kernel_regularizer=l2(1e-4)
+    )(drop)
     return input_mem, classification
 
 class EarlyStopping(Callback):
