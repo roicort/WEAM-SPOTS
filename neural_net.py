@@ -61,8 +61,6 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
 def get_encoder():
     dropout = 0.1
     input_data = Input(shape=(dataset.columns, dataset.rows, 1))
-    # Las imagenes son normalizadas a [0, 1] para evitar problemas de convergencia.
-    input_data = Rescaling(1./255)(input_data) 
     filters = constants.domain // 16
     output = conv_block(input_data, 2, filters, dropout, first_block=True)
     filters *= 2
@@ -190,6 +188,10 @@ def train_network(prefix, es):
         validation_labels = training_labels[truly_training:]
         training_data = training_data[:truly_training]
         training_labels = training_labels[:truly_training]
+
+        training_data = training_data / 255.0
+        validation_data = validation_data / 255.0
+        testing_data = testing_data / 255.0
 
         training_labels = to_categorical(training_labels)
         validation_labels = to_categorical(validation_labels)
