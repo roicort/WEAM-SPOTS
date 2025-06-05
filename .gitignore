@@ -3,7 +3,6 @@ test/
 runs-32/*
 runs-64/*
 runs-128/*
-runs-256/*
 runs-512/*
 !runs-32/mem_params.csv
 !runs-64/mem_params.csv

@@ -189,6 +189,10 @@ def train_network(prefix, es):
         training_data = training_data[:truly_training]
         training_labels = training_labels[:truly_training]
 
+        training_data = training_data / 255.0
+        validation_data = validation_data / 255.0
+        testing_data = testing_data / 255.0
+
         training_labels = to_categorical(training_labels)
         validation_labels = to_categorical(validation_labels)
         testing_labels = to_categorical(testing_labels)
