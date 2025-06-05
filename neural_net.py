@@ -21,7 +21,7 @@ from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Fl
     Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D, \
     UpSampling2D
 from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.callbacks import Callback, TensorBoard
 from joblib import Parallel, delayed
 import constants
 import dataset
@@ -223,14 +223,22 @@ def train_network(prefix, es):
                     optimizer='adam',
                     metrics={'classifier': 'accuracy', 'decoder': rmse})
         model.summary()
+        
+        log_dir = f"logs/tensorboard/{constants.domain}_{prefix}_fold{fold}"
+        TensorboardCallback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+
         history = model.fit(training_data,
                 (training_labels, training_data),
                 batch_size=batch_size,
                 epochs=epochs,
                 validation_data= (validation_data,
                     {'classifier': validation_labels, 'decoder': validation_data}),
-                callbacks=[EarlyStopping(),
-                    ProgressBar(epochs), ReconstructionsSaver(autoencoder, validation_data, constants.domain)],
+                callbacks=[
+                    EarlyStopping(),
+                    ProgressBar(epochs),
+                    ReconstructionsSaver(autoencoder, validation_data, constants.domain),
+                    TensorboardCallback
+                ],
                 verbose=0)
         histories.append(history)
         history = full_classifier.evaluate(testing_data, testing_labels, return_dict=True)
@@ -345,36 +353,48 @@ class ProgressBar(Callback):
     def on_train_end(self, logs=None):
         self.progress.stop()
 
-def save_reconstructions(autoencoder, data, domain, epoch, output_dir="reconstructions"):
-    os.makedirs(output_dir, exist_ok=True)
-    decoded_imgs = autoencoder.predict(data[:10])
-    n = 10
-    plt.figure(figsize=(20, 4))
-    for i in range(n):
-        # Imagen original
-        ax = plt.subplot(2, n, i + 1)
-        img_orig = (data[i].reshape(data.shape[1], data.shape[2]) * 255).astype(np.uint8)
-        plt.imshow(img_orig, cmap="gray")
-        plt.title("Original")
-        plt.axis("off")
-        # Imagen reconstruida
-        ax = plt.subplot(2, n, i + 1 + n)
-        img_recon = (decoded_imgs[i].reshape(data.shape[1], data.shape[2]) * 255).astype(np.uint8)
-        plt.imshow(img_recon, cmap="gray")
-        plt.title("Reconstruida")
-        plt.axis("off")
-    plt.savefig(os.path.join(output_dir, f"{domain}_epoch_{epoch}.png"))
-    plt.close()
 
 class ReconstructionsSaver(Callback):
-    def __init__(self, autoencoder, data, domain, output_dir="decoded", every_n_epochs=10):
+    def __init__(self, autoencoder, data, domain, every_n_epochs=10, output_dir="decoded", log_dir="logs/tensorboard"):
         super().__init__()
         self.autoencoder = autoencoder
         self.data = data
         self.domain = domain
         self.output_dir = output_dir
         self.every_n_epochs = every_n_epochs
+        self.writer = tf.summary.create_file_writer(log_dir)
+        self.n = 10
+        os.makedirs(self.output_dir, exist_ok=True)
 
     def on_epoch_end(self, epoch, logs=None):
         if (epoch + 1) % self.every_n_epochs == 0:
-            save_reconstructions(self.autoencoder, self.data, self.domain, epoch + 1, self.output_dir)
+
+            originals = self.data[:self.n]
+            decoded_imgs = self.autoencoder.predict(originals)
+
+            plt.figure(figsize=(20, 4))
+            for i in range(self.n):
+                # Imagen original
+                ax = plt.subplot(2, self.n, i + 1)
+                img_orig = (originals[i].reshape(originals.shape[1], originals.shape[2]) * 255).astype(np.uint8)
+                plt.imshow(img_orig, cmap="gray")
+                plt.title("Original")
+                plt.axis("off")
+                # Imagen reconstruida
+                ax = plt.subplot(2, self.n, i + 1 + self.n)
+                img_recon = (decoded_imgs[i].reshape(originals.shape[1], originals.shape[2]) * 255).astype(np.uint8)
+                plt.imshow(img_recon, cmap="gray")
+                plt.title("Reconstruida")
+                plt.axis("off")
+            plt.savefig(os.path.join(self.output_dir, f"{self.domain}_epoch_{epoch+1}.png"))
+            plt.close()
+
+            if originals.ndim == 3:
+                originals = originals[..., np.newaxis]
+            if decoded_imgs.ndim == 3:
+                decoded_imgs = decoded_imgs[..., np.newaxis]
+
+            with self.writer.as_default():
+                tf.summary.image(f"{self.domain}_originals", originals, step=epoch+1, max_outputs=self.n)
+                tf.summary.image(f"{self.domain}_reconstructions", decoded_imgs, step=epoch+1, max_outputs=self.n)
+            self.writer.flush()
