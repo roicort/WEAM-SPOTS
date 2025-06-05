@@ -25,3 +25,8 @@ Para más detalles, consulta [SPOTS/README.md](SPOTS/README.md).
 
 ## Uso 
 
+sh train.sh && choose.py && sh dream.sh
+
+## Experimentos
+
+Cada experimento esta en una rama, el primero y el segundo fueron con y sin normalizar. El tercero tiene el mejor score obtenido para el clasificador > 80%. En el cuarto se reproduce con las imagenes del autoencoder.
