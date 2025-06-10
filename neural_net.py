@@ -17,9 +17,8 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Input, Conv2D, MaxPool2D, Dropout, Dense, Flatten, \
-    Reshape, Conv2DTranspose, BatchNormalization, LayerNormalization, SpatialDropout2D, \
-    UpSampling2D
+from tensorflow.keras.layers import (Input, Conv2D, BatchNormalization, Activation, 
+                                     Add, Dropout, Flatten, Dense, Reshape, Conv2DTranspose, LayerNormalization, MaxPooling2D)
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback, TensorBoard
 from joblib import Parallel, delayed
@@ -57,47 +56,46 @@ def conv_block(entry, layers, filters, dropout, first_block = False):
     drop = SpatialDropout2D(0.4)(pool)
     return drop
 
+def residual_block(x, filters, kernel_size=3, dropout_rate=0.2):
+    shortcut = x
+    x = Conv2D(filters, kernel_size, padding='same', kernel_initializer='he_normal')(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(filters, kernel_size, padding='same', kernel_initializer='he_normal')(x)
+    x = BatchNormalization()(x)
+    if shortcut.shape[-1] != filters:
+        shortcut = Conv2D(filters, 1, padding='same', kernel_initializer='he_normal')(shortcut)
+    x = Add()([x, shortcut])
+    x = Activation('relu')(x)
+    x = Dropout(dropout_rate)(x)
+    return x
+
 def get_encoder():
-    dropout = 0.1
     input_data = Input(shape=(dataset.columns, dataset.rows, 1))
-    filters = constants.domain // 16
-    output = conv_block(input_data, 2, filters, dropout, first_block=True)
-    filters *= 2
-    dropout += 0.7
-    output = conv_block(output, 2, filters, dropout)
-    filters *= 2
-    dropout += 0.7
-    output = conv_block(output, 3, filters, dropout)
-    filters *= 2
-    dropout += 0.7
-    output = conv_block(output, 3, filters, dropout)
-    filters *= 2
-    dropout += 0.9
-    output = conv_block(output, 3, filters, dropout)
-    output = Flatten()(output)
-    output = LayerNormalization(name = 'encoded')(output)
-    return input_data, output
+    x = Conv2D(32, 3, padding='same', kernel_initializer='he_normal')(input_data)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = residual_block(x, 32)
+    x = MaxPooling2D(pool_size=2)(x) 
+    x = residual_block(x, 64)
+    x = MaxPooling2D(pool_size=2)(x)
+    x = residual_block(x, 128)
+    x = Flatten()(x)
+    x = Dense(constants.domain, activation='relu')(x)
+    x = LayerNormalization(name='encoded')(x)
+    return input_data, x
 
 def get_decoder():
-    input_mem = Input(shape=(constants.domain, ))
+    input_mem = Input(shape=(constants.domain,))
     width = dataset.columns // 4
-    filters = constants.domain // 2
-    dense = Dense(
-        width*width*filters, activation = 'relu',
-        input_shape=(constants.domain, ) )(input_mem)
-    output = Reshape((width, width, filters))(dense)
-    filters *= 2
-    dropout = 0.4
-    for i in range(2):
-        trans = Conv2D(kernel_size=3, strides=1,padding='same', activation='relu',
-            filters= filters)(output)
-        pool = UpSampling2D(size=2)(trans)
-        output = SpatialDropout2D(dropout)(pool)
-        dropout /= 2.0
-        filters = filters // 2 
-        output = BatchNormalization()(output)
-    output = Conv2D(filters = 1, kernel_size=3, strides=1,activation='sigmoid', padding='same')(output)
-    return input_mem, output
+    x = Dense(width * width * 128, activation='relu')(input_mem)
+    x = Reshape((width, width, 128))(x)
+    x = Conv2DTranspose(128, 3, strides=2, padding='same', activation='relu', kernel_initializer='he_normal')(x)
+    x = BatchNormalization()(x)
+    x = Conv2DTranspose(64, 3, strides=2, padding='same', activation='relu', kernel_initializer='he_normal')(x)
+    x = BatchNormalization()(x)
+    x = Conv2D(1, 3, padding='same', activation='sigmoid')(x)
+    return input_mem, x
 
 def get_classifier():
     input_mem = Input(shape=(constants.domain, ))
