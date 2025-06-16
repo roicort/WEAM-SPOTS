@@ -18,7 +18,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.layers import (Input, Conv2D, BatchNormalization, Activation, 
-                                     Add, Dropout, Flatten, Dense, Reshape, Conv2DTranspose, LayerNormalization, MaxPooling2D)
+                                     Add, Dropout, Flatten, Dense, Reshape, Conv2DTranspose, LayerNormalization, MaxPooling2D, LeakyReLU, SpatialDropout2D)
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import Callback, TensorBoard
 from joblib import Parallel, delayed
@@ -41,32 +41,17 @@ epochs = 300
 patience = 7
 truly_training_percentage = 0.80
 
-def conv_block(entry, layers, filters, dropout, first_block = False):
-    conv = None
-    for i in range(layers):
-        if first_block:
-            conv = Conv2D(kernel_size =3, padding ='same', activation='relu', 
-                filters = filters, input_shape = (dataset.columns, dataset.rows, 1))(entry)
-            first_block = False
-        else:
-            conv = Conv2D(kernel_size =3, padding ='same', activation='relu', 
-                filters = filters)(entry)
-        entry = BatchNormalization()(conv)
-    pool = MaxPool2D(pool_size = 3, strides =2, padding ='same')(entry)
-    drop = SpatialDropout2D(0.4)(pool)
-    return drop
-
-def residual_block(x, filters, kernel_size=3, dropout_rate=0.2):
+def residual_block(x, filters, kernel_size=3, dropout_rate=0.1):
     shortcut = x
     x = Conv2D(filters, kernel_size, padding='same', kernel_initializer='he_normal')(x)
     x = BatchNormalization()(x)
-    x = Activation('relu')(x)
+    x = LeakyReLU(negative_slope=0.1)(x)
     x = Conv2D(filters, kernel_size, padding='same', kernel_initializer='he_normal')(x)
     x = BatchNormalization()(x)
     if shortcut.shape[-1] != filters:
         shortcut = Conv2D(filters, 1, padding='same', kernel_initializer='he_normal')(shortcut)
     x = Add()([x, shortcut])
-    x = Activation('relu')(x)
+    x = LeakyReLU(negative_slope=0.1)(x)
     x = Dropout(dropout_rate)(x)
     return x
 
@@ -74,12 +59,15 @@ def get_encoder():
     input_data = Input(shape=(dataset.columns, dataset.rows, 1))
     x = Conv2D(32, 3, padding='same', kernel_initializer='he_normal')(input_data)
     x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = residual_block(x, 32)
-    x = MaxPooling2D(pool_size=2)(x) 
-    x = residual_block(x, 64)
+    x = LeakyReLU(negative_slope=0.1)(x)
+    x = residual_block(x, 32, dropout_rate=0.1)
     x = MaxPooling2D(pool_size=2)(x)
-    x = residual_block(x, 128)
+    x = residual_block(x, 64, dropout_rate=0.1)
+    x = MaxPooling2D(pool_size=2)(x)
+    x = residual_block(x, 128, dropout_rate=0.1)
+    x = MaxPooling2D(pool_size=2)(x)
+    x = residual_block(x, 256, dropout_rate=0.1)
+    x = MaxPooling2D(pool_size=2)(x)
     x = Flatten()(x)
     x = Dense(constants.domain, activation='relu')(x)
     x = LayerNormalization(name='encoded')(x)
@@ -87,14 +75,25 @@ def get_encoder():
 
 def get_decoder():
     input_mem = Input(shape=(constants.domain,))
-    width = dataset.columns // 4
-    x = Dense(width * width * 128, activation='relu')(input_mem)
-    x = Reshape((width, width, 128))(x)
-    x = Conv2DTranspose(128, 3, strides=2, padding='same', activation='relu', kernel_initializer='he_normal')(x)
-    x = BatchNormalization()(x)
-    x = Conv2DTranspose(64, 3, strides=2, padding='same', activation='relu', kernel_initializer='he_normal')(x)
-    x = BatchNormalization()(x)
+    # Calcula el tamaño correcto después de 4 poolings
+    width = dataset.columns // 16
+    height = dataset.rows // 16
+    x = Dense(width * height * 256, activation='relu')(input_mem)
+    x = Reshape((width, height, 256))(x)
+    for filters in [256, 128, 64, 32]:
+        x = Conv2DTranspose(filters, 3, strides=2, padding='same', kernel_initializer='he_normal')(x)
+        x = BatchNormalization()(x)
+        x = LeakyReLU(negative_slope=0.1)(x)
+        x = SpatialDropout2D(0.2)(x)
+        x = Conv2DTranspose(filters, 3, strides=1, padding='same', kernel_initializer='he_normal')(x)
+        x = BatchNormalization()(x)
+        x = LeakyReLU(negative_slope=0.1)(x)
+        x = SpatialDropout2D(0.2)(x)
+    # Ajusta el tamaño final si es necesario
     x = Conv2D(1, 3, padding='same', activation='sigmoid')(x)
+    x = tf.keras.layers.Cropping2D(
+        ((0, x.shape[1] - dataset.columns), (0, x.shape[2] - dataset.rows))
+    )(x) if (x.shape[1] > dataset.columns or x.shape[2] > dataset.rows) else x
     return input_mem, x
 
 def get_classifier():
@@ -353,7 +352,7 @@ class ProgressBar(Callback):
 
 
 class ReconstructionsSaver(Callback):
-    def __init__(self, autoencoder, data, domain, every_n_epochs=10, output_dir="decoded", log_dir="logs/tensorboard"):
+    def __init__(self, autoencoder, data, domain, every_n_epochs=5, output_dir="decoded", log_dir="logs/tensorboard"):
         super().__init__()
         self.autoencoder = autoencoder
         self.data = data
@@ -361,7 +360,7 @@ class ReconstructionsSaver(Callback):
         self.output_dir = output_dir
         self.every_n_epochs = every_n_epochs
         self.writer = tf.summary.create_file_writer(log_dir)
-        self.n = 10
+        self.n = 5
         os.makedirs(self.output_dir, exist_ok=True)
 
     def on_epoch_end(self, epoch, logs=None):
@@ -370,15 +369,14 @@ class ReconstructionsSaver(Callback):
             originals = self.data[:self.n]
             decoded_imgs = self.autoencoder.predict(originals)
 
+            # Para guardar como PNG (escala 0-255)
             plt.figure(figsize=(20, 4))
             for i in range(self.n):
-                # Imagen original
                 ax = plt.subplot(2, self.n, i + 1)
                 img_orig = (originals[i].reshape(originals.shape[1], originals.shape[2]) * 255).astype(np.uint8)
                 plt.imshow(img_orig, cmap="gray")
                 plt.title("Original")
                 plt.axis("off")
-                # Imagen reconstruida
                 ax = plt.subplot(2, self.n, i + 1 + self.n)
                 img_recon = (decoded_imgs[i].reshape(originals.shape[1], originals.shape[2]) * 255).astype(np.uint8)
                 plt.imshow(img_recon, cmap="gray")
@@ -387,12 +385,17 @@ class ReconstructionsSaver(Callback):
             plt.savefig(os.path.join(self.output_dir, f"{self.domain}_epoch_{epoch+1}.png"))
             plt.close()
 
-            if originals.ndim == 3:
-                originals = originals[..., np.newaxis]
-            if decoded_imgs.ndim == 3:
-                decoded_imgs = decoded_imgs[..., np.newaxis]
+            # Para TensorBoard: asegurarse de que estén en [0,1] y tipo float32
+            orig_tb = originals
+            recon_tb = decoded_imgs
+            if orig_tb.ndim == 3:
+                orig_tb = orig_tb[..., np.newaxis]
+            if recon_tb.ndim == 3:
+                recon_tb = recon_tb[..., np.newaxis]
+            orig_tb = np.clip(orig_tb, 0, 1).astype(np.float32)
+            recon_tb = np.clip(recon_tb, 0, 1).astype(np.float32)
 
             with self.writer.as_default():
-                tf.summary.image(f"{self.domain}_originals", originals, step=epoch+1, max_outputs=self.n)
-                tf.summary.image(f"{self.domain}_reconstructions", decoded_imgs, step=epoch+1, max_outputs=self.n)
+                tf.summary.image(f"{self.domain}_originals", orig_tb, step=epoch+1, max_outputs=self.n)
+                tf.summary.image(f"{self.domain}_reconstructions", recon_tb, step=epoch+1, max_outputs=self.n)
             self.writer.flush()

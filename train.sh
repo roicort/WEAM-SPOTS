@@ -4,7 +4,7 @@ LOGFILE="logs/train.logs.txt"
 
 echo "========== TRAINING STARTED: $(date) ==========" > $LOGFILE
 
-for n in 32 64 128 256 512; do
+for n in 256; do
     echo "" >> $LOGFILE
     echo "----- Domain size: $n -----" >> $LOGFILE
 

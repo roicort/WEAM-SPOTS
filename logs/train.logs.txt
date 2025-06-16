@@ -1,0 +1,11 @@
+========== TRAINING STARTED: martes, 10 de junio de 2025, 20:37:52 CST ==========
+
+----- Domain size: 256 -----
+    [martes, 10 de junio de 2025, 20:53:59 CST] Step -n completed. Time: 967 seconds.
+    [martes, 10 de junio de 2025, 20:54:13 CST] Step -f completed. Time: 14 seconds.
+    [martes, 10 de junio de 2025, 21:06:57 CST] Step -e completed. Time: 764 seconds.
+    [martes, 10 de junio de 2025, 21:06:57 CST] Training for domain 256 completed.
+------------------------------
+
+========== TRAINING FINISHED: martes, 10 de junio de 2025, 21:06:57 CST ==========
+Total training time: 1745 seconds.
