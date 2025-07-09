@@ -17,10 +17,7 @@
 
 import math
 import numpy as np
-from operator import itemgetter
 import random
-import time
-
 import constants
 
 def normpdf(x, mean, sd, scale = 1.0):
@@ -28,10 +25,6 @@ def normpdf(x, mean, sd, scale = 1.0):
     denom = (2*math.pi*var)**.5
     num = math.exp(-(float(x)-float(mean))**2/(2*var))
     return num/(scale*denom)
-
-
-class AssociativeMemoryError(Exception):
-    pass
 
 class AssociativeMemory(object):
     def __init__(self, n: int, m: int,
@@ -294,85 +287,3 @@ class AssociativeMemory(object):
             r_io = np.full(self.n, self.undefined)
         r_io = self.revalidate(r_io)
         return r_io, accept, weight
-
-
-class AssociativeMemorySystem:
-    def __init__(self, labels: list, n: int, m: int, params = None):
-        self._memories = {}
-        self.n = n
-        self.m = m
-        self._updated = True
-        self._mean = 0.0
-        self._labels = labels
-        if params is None:
-            params = self.default_parameters(labels)
-        elif len(params) != len(labels):
-            raise ValueError('Lenght of list of labels (',
-                len(labels), ') and lenght of parameters (', len(params), ') differ.')
-        for label, p in zip(labels, params):
-            self._memories[label] = AssociativeMemory(n, m, p[constants.xi_idx], 
-                    p[constants.sigma_idx], p[constants.iota_idx], 
-                    p[constants.kappa_idx])
-        self._params = params
-
-    @property
-    def num_mems(self):
-        return len(self._memories)
-
-    @property
-    def full_undefined(self):
-        return np.full(self.n, np.nan)
-
-    @property
-    def mean(self):
-        if self._updated:
-            return self._mean
-        self.update()
-        return self._mean
-
-    def update(self):
-        means = []
-        for label in self._memories:
-            m = self._memories[label]
-            mean = m.mean
-            means.append(mean)
-        self._mean = np.mean(means)
-
-    def default_parameters(labels):
-        params = []
-        for label in labels:
-            p = [label, constants.iota_default, constants.kappa_default, 
-                constants.xi_default, constants.sigma_default]
-            params.append(p)
-        return np.array(params)
-
-    def register(self, mem, vector):
-        if not (mem in self._memories):
-            raise ValueError(f'There is no memory for {mem}')
-        self._memories[mem].register(vector)
-        self._updated = False
-
-    def recognize(self, vector):
-        for k in self._memories:
-            recognized, weight = self._memories[k].recognize(vector, False)
-            if recognized:
-                return True
-        return False
-
-    def recall(self, vector):
-        penalty = float('inf')
-        memory = None
-        mem_recall = self.full_undefined
-        keys = list(self._memories)
-        random.shuffle(keys)
-        for k in keys:
-            recalled, recognized, weight = self._memories[k].recall(vector)
-            if recognized:
-                entropy = self._memories[k].entropy
-                new_penalty = entropy/weight if weight > 0 else float('inf')
-                if new_penalty < penalty:
-                    penalty = new_penalty
-                    memory = k
-                    mem_recall = recalled
-        return (memory, mem_recall)
-

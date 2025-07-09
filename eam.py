@@ -31,7 +31,7 @@ Options:
   -l        Chooses Language for graphs.
 """
 
-from associative import AssociativeMemory, AssociativeMemorySystem
+from associative import AssociativeMemory
 import constants
 import dataset
 import neural_net
@@ -370,6 +370,7 @@ def get_ams_results(
     # Recognize test data.
     confrix, behaviour = recognize_by_memory(
         eam, tef_rounded, tel, msize, min_value, max_value, classifier)
+    
     responses = len(tel) - behaviour[constants.no_response_idx]
     precision = behaviour[constants.correct_response_idx]/float(responses)
     recall = behaviour[constants.correct_response_idx]/float(len(tel))
